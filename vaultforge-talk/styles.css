@@ -1,0 +1,21 @@
+/* Player Input Bubble */
+.player-bubble {
+  background-color: #000000; /* black */
+  color: #ff0000;           /* red text */
+  border-radius: 18px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  max-width: 70%;
+  align-self: flex-end;
+}
+
+/* NPC Response Bubble */
+.npc-bubble {
+  background-color: #1e40af; /* deep blue */
+  color: #ffffff;            /* white */
+  border-radius: 18px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  max-width: 70%;
+  align-self: flex-start;
+}

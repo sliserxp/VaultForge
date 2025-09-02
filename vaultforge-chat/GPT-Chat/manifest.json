@@ -1,0 +1,10 @@
+{
+  "id": "gpt-chat",
+  "name": "GPT-Chat",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Rolling chat plugin for GPT-Core with Obsidian note saving.",
+  "author": "Sliser_xp"
+  "main": "main.js"
+}
+

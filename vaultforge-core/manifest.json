@@ -1,0 +1,10 @@
+{
+  "id": "vaultforge-core",
+  "name": "VaultForge-Core",
+  "version": "0.3.0",
+  "minAppVersion": "1.5.0",
+  "description": "Core VaultForge plugin: provides API key, chat, embeddings, and vault index for other VaultForge plugins.",
+  "author": "Sliser",
+  "main": "main.js"
+}
+

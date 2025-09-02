@@ -1,0 +1,10 @@
+{
+  "id": "vaultforge-chat",
+  "name": "VaultForge-Chat",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Rolling chat plugin for VaultForge-Core with Obsidian note saving.",
+  "author": "Sliser",
+  "main": "main.js"
+}
+

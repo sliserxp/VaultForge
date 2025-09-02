@@ -1,0 +1,18 @@
+{
+  "name": "vaultforge-core",
+  "version": "0.3.0",
+  "description": "Core VaultForge plugin providing GPT API access, embeddings, and vault indexing for other VaultForge plugins.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.js --watch",
+    "build": "node esbuild.config.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "openai": "^5.16.0"
+  }
+}
+

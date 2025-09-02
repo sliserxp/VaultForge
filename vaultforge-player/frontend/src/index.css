@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Override white backgrounds for dark mode */
+.bg-white {
+  background-color: #1f2937 !important; /* Tailwind gray-800 */
+  color: #f9fafb !important;
+}
+

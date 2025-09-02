@@ -1,0 +1,16 @@
+{
+  "name": "vaultforge-chat",
+  "version": "1.0.0",
+  "description": "Obsidian VaultForge-Chat Plugin (rolling chat for VaultForge-Core)",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.js --watch",
+    "build": "node esbuild.config.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}
+

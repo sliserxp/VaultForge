@@ -1,0 +1,11 @@
+{
+  "id": "vaultforge-player",
+  "name": "VaultForge-Player",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Player dashboard for VaultForge (character, inventory, shop, talk, lore)",
+  "author": "Sliser",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}
+
