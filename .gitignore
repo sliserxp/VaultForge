@@ -1,0 +1,26 @@
+# Node / build
+node_modules/
+dist/
+build/
+.esbuild/
+.vite/
+*.log
+
+# Obsidian/plugin artifacts
+.obsidian/plugins/**/node_modules/
+.obsidian/plugins/**/dist/
+.obsidian/plugins/**/.DS_Store
+.obsidian/plugins/**/data.json
+.obsidian/plugins/gpt5-plugin
+.obsidian/plugins/VoiceActor
+
+# Env / secrets
+.env
+.env.*
+*.key
+*.bak
+*.tmp
+*.pem
+*_config.json
+continue/config.json
+
