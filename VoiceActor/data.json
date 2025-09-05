@@ -1,0 +1,17 @@
+{
+  "apiKey": "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",
+  "defaultVoice": "alloy",
+  "defaultTone": "neutral",
+  "defaultAccent": "american",
+  "provider": "piper",
+  "outDir": "Audio",
+  "rate": 1,
+  "webSpeechVoiceName": "",
+  "piperBinaryPath": "/home/dungeonmaster/bin/piper/piper",
+  "piperModelPath": "/home/dungeonmaster/piper-models/voice-en-us-lessac-medium/en-us-lessac-medium.onnx",
+  "piperLengthScale": 1,
+  "piperNoiseScale": 0.667,
+  "piperNoiseW": 0.333,
+  "voiceMap": {},
+  "autoEmbedAfterRender": true
+}

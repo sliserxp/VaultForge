@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { characterSchema } from "./schema";
 import { RenderField } from "./RenderField";
 import ShopView from "./ShopView";
@@ -23,6 +23,7 @@ export default function App() {
     }
   }, [selected]);
 
+  // ---------- Save Logic ----------
   async function updatePlayer(updates: any) {
     if (!selected) return;
     await fetch(`/api/player/${selected}`, {
@@ -30,9 +31,23 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    setPlayer({ ...player, ...updates }); // optimistic update
+    setPlayer((prev: any) => ({ ...prev, ...updates })); // optimistic update
   }
-  
+
+  // Inline debounce (no utils file)
+  function useDebounced(fn: (...args: any[]) => void, delay: number) {
+    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    return useMemo(() => {
+      return (...args: any[]) => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => fn(...args), delay);
+      };
+    }, [fn, delay]);
+  }
+
+  const debouncedUpdate = useDebounced(updatePlayer, 1000);
+
+  // ---------- Tabs ----------
   const renderTab = () => {
     switch (tab) {
       case "Character":
@@ -61,18 +76,23 @@ export default function App() {
                 <RenderField
                   schema={schema}
                   value={player[field]}
-                  onChange={(val: any) => updatePlayer({ [field]: val })}
+                  // Local state update first
+                  onChange={(val: any) => {
+                    setPlayer((prev: any) => ({ ...prev, [field]: val }));
+                    debouncedUpdate({ [field]: val });
+                  }}
+                  // Force save on blur (safety net)
+                  onBlur={() => updatePlayer({ [field]: player[field] })}
                 />
               </div>
             ))}
           </div>
         );
+
       case "Inventory": return <div>Inventory Tab Placeholder</div>;
       case "Spells": return <div>Spells Tab Placeholder</div>;
-      case "Shop":
-        if (!player) {
-          return <div>Please select a character first.</div>;
-        }
+      case "Shop": {
+        if (!player) return <div>Please select a character first.</div>;
 
         function handleBuy(item: any) {
           const cost = item.value ? item.value / 100 : 0; // cp → gp
@@ -129,6 +149,7 @@ export default function App() {
             onBuy={handleBuy}
           />
         );
+      }
 
       case "Talk": return <div>Talk Tab Placeholder</div>;
       case "Lore": return <div>Lore Tab Placeholder</div>;

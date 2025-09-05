@@ -6,6 +6,7 @@
   "description": "Player dashboard for VaultForge (character, inventory, shop, talk, lore)",
   "author": "Sliser",
   "authorUrl": "",
+  "main": "main.js",
   "isDesktopOnly": true
 }
 

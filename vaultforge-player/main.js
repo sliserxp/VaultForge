@@ -27010,15 +27010,6 @@ var import_qrcode = __toESM(require_lib());
 var import_os = __toESM(require("os"));
 var import_express = __toESM(require_express2());
 var import_path = require("path");
-function abilityModifier(score) {
-  return Math.floor((score - 10) / 2);
-}
-function skillModifier(abilityScore, proficiencyBonus, profLevel) {
-  const mod = abilityModifier(abilityScore);
-  if (profLevel === "proficient") return mod + proficiencyBonus;
-  if (profLevel === "expertise") return mod + proficiencyBonus * 2;
-  return mod;
-}
 var DEFAULT_SETTINGS = {
   port: 3e3,
   playersPath: "Players",
@@ -27026,27 +27017,47 @@ var DEFAULT_SETTINGS = {
   lorePath: "Lore",
   activePlayer: ""
 };
-var SKILLS = {
-  acrobatics: "dexterity",
-  animal_handling: "wisdom",
-  arcana: "intelligence",
-  athletics: "strength",
-  deception: "charisma",
-  history: "intelligence",
-  insight: "wisdom",
-  intimidation: "charisma",
-  investigation: "intelligence",
-  medicine: "wisdom",
-  nature: "intelligence",
-  perception: "wisdom",
-  performance: "charisma",
-  persuasion: "charisma",
-  religion: "intelligence",
-  sleight_of_hand: "dexterity",
-  stealth: "dexterity",
-  survival: "wisdom"
-};
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
+      if (!target[key] || typeof target[key] !== "object") {
+        target[key] = {};
+      }
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+function parseIfJson(value) {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+function sanitizeData(data) {
+  if (Array.isArray(data)) {
+    return data.map(parseIfJson).map(sanitizeData);
+  } else if (typeof data === "object" && data !== null) {
+    const result = {};
+    for (const [k, v] of Object.entries(data)) {
+      result[k] = sanitizeData(parseIfJson(v));
+    }
+    return result;
+  }
+  return parseIfJson(data);
+}
 var VaultForgePlayer = class extends import_obsidian.Plugin {
+  constructor() {
+    super(...arguments);
+    this.server = null;
+    this.updating = false;
+  }
   async onload() {
     console.log("[VaultForge-Player] loaded \u2705");
     await this.loadSettings();
@@ -27062,11 +27073,11 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
       "dist"
     );
     app.use("/", import_express.default.static(distPath));
-    app.get("/api/players", async (req, res) => {
+    app.get("/api/players", async (_req, res) => {
       try {
         const folderPath = this.settings.playersPath || "Players";
         const folder = this.app.vault.getAbstractFileByPath(folderPath);
-        if (!folder || !("children" in folder)) {
+        if (!(folder instanceof import_obsidian.TFolder)) {
           return res.json([]);
         }
         const players = folder.children.filter((f) => f instanceof import_obsidian.TFile && f.extension === "md").map((f) => f.basename);
@@ -27093,9 +27104,34 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
         res.status(500).json({ error: "Failed to load player" });
       }
     });
-    app.get("/", (req, res) => {
-      res.sendFile((0, import_path.join)(distPath, "index.html"));
-    });
+    app.post(
+      "/api/player/:name",
+      import_express.default.json(),
+      async (req, res) => {
+        try {
+          const filePath = `${this.settings.playersPath}/${req.params.name}.md`;
+          const file = this.app.vault.getAbstractFileByPath(filePath);
+          if (!(file instanceof import_obsidian.TFile)) {
+            return res.status(404).json({ error: "Player not found" });
+          }
+          const content = await this.app.vault.read(file);
+          const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+          const current = yamlMatch ? (0, import_obsidian.parseYaml)(yamlMatch[1]) || {} : {};
+          const cleanedUpdates = sanitizeData(req.body);
+          deepMerge(current, cleanedUpdates);
+          const newYaml = "---\n" + (0, import_obsidian.stringifyYaml)(current) + "---";
+          const newContent = yamlMatch ? content.replace(/^---\n([\s\S]*?)\n---/, newYaml) : newYaml + "\n" + content;
+          this.updating = true;
+          await this.app.vault.modify(file, newContent);
+          this.updating = false;
+          res.json({ success: true, data: current });
+        } catch (err) {
+          this.updating = false;
+          console.error("[VaultForge-Player] Error saving player:", err);
+          res.status(500).json({ error: "Failed to save player" });
+        }
+      }
+    );
     this.server = app.listen(port, () => {
       console.log(`[VaultForge-Player] server running at http://localhost:${port}`);
     });
@@ -27171,8 +27207,10 @@ var VaultForgePlayerSettingTab = class extends import_obsidian.PluginSettingTab 
       img.style.maxWidth = "150px";
     });
     new import_obsidian.Setting(containerEl).setName("Active Player").setDesc("Select which character to load").addDropdown((drop) => {
-      const playersFolder = this.plugin.app.vault.getAbstractFileByPath(this.plugin.settings.playersPath);
-      if (playersFolder && "children" in playersFolder) {
+      const playersFolder = this.plugin.app.vault.getAbstractFileByPath(
+        this.plugin.settings.playersPath
+      );
+      if (playersFolder && playersFolder instanceof import_obsidian.TFolder) {
         playersFolder.children.forEach((file) => {
           if (file instanceof import_obsidian.TFile && file.path.endsWith(".md")) {
             const charName = file.basename;
@@ -27186,40 +27224,6 @@ var VaultForgePlayerSettingTab = class extends import_obsidian.PluginSettingTab 
         this.display();
       });
     });
-    if (this.plugin.settings.activePlayer) {
-      const filePath = `${this.plugin.settings.playersPath}/${this.plugin.settings.activePlayer}.md`;
-      const file = this.plugin.app.vault.getAbstractFileByPath(filePath);
-      if (file instanceof import_obsidian.TFile) {
-        this.plugin.app.vault.read(file).then((content) => {
-          const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
-          if (!yamlMatch) return;
-          const data = (0, import_obsidian.parseYaml)(yamlMatch[1]);
-          const profBonus = data.proficiency_bonus ?? 2;
-          containerEl.createEl("h3", { text: "Skills" });
-          Object.entries(SKILLS).forEach(([skill, ability]) => {
-            const abilityScore = data.abilities?.[ability] ?? 10;
-            const level = data.skills?.[skill] ?? "none";
-            const score = skillModifier(abilityScore, profBonus, level);
-            new import_obsidian.Setting(containerEl).setName(`${skill.charAt(0).toUpperCase() + skill.slice(1)} (${score >= 0 ? "+" : ""}${score})`).setDesc(`Based on ${ability.toUpperCase()}`).addDropdown((drop) => {
-              drop.addOption("none", "None");
-              drop.addOption("proficient", "Proficient");
-              drop.addOption("expertise", "Expertise");
-              drop.setValue(level);
-              drop.onChange(async (val) => {
-                data.skills[skill] = val;
-                const newYaml = "---\n" + (0, import_obsidian.stringifyYaml)(data) + "---";
-                const newContent = content.replace(/^---\n([\s\S]*?)\n---/, newYaml);
-                await this.plugin.app.vault.modify(file, newContent);
-                this.display();
-              });
-            });
-          });
-        }).catch((err) => {
-          new import_obsidian.Notice("Failed to read player file");
-          console.error(err);
-        });
-      }
-    }
   }
 };
 /*! Bundled license information:

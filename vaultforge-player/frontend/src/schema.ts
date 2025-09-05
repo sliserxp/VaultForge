@@ -1,7 +1,8 @@
 export const characterSchema = {
+  // Character Info
   core: {
     type: "group",
-    label: "Core Info",
+    label: "Character",
     fields: {
       name: { type: "string", label: "Character Name" },
       class: { type: "string", label: "Class & Level" },
@@ -14,18 +15,22 @@ export const characterSchema = {
     }
   },
 
+  // Health
+  hp: {
+    type: "group",
+    label: "Health",
+    fields: {
+      hp_max: { type: "number", label: "Max HP" },
+      hp_current: { type: "number", label: "Current HP" },
+      hp_temp: { type: "number", label: "Temporary HP" }
+    }
+  },
+
+  // Combat
   combat: {
     type: "group",
     label: "Combat Stats",
     fields: {
-      hp: {
-        type: "group",
-        fields: {
-          max: { type: "number", label: "Max HP" },
-          current: { type: "number", label: "Current HP" },
-          temp: { type: "number", label: "Temporary HP" }
-        }
-      },
       armor_class: { type: "number", label: "Armor Class" },
       initiative: { type: "number", label: "Initiative" },
       speed: { type: "number", label: "Speed" },
@@ -35,6 +40,7 @@ export const characterSchema = {
     }
   },
 
+  // Abilities
   abilities: {
     type: "group",
     label: "Abilities",
@@ -48,18 +54,25 @@ export const characterSchema = {
     }
   },
 
-  saving_throws: {
-    type: "map",
-    label: "Saving Throws",
-    options: ["none", "proficient"]
+  // Saving Throws & Skills
+  proficiencies: {
+    type: "group",
+    label: "Proficiencies",
+    fields: {
+      saving_throws: {
+        type: "map",
+        label: "Saving Throws",
+        options: ["none", "proficient"]
+      },
+      skills: {
+        type: "map",
+        label: "Skills",
+        options: ["none", "proficient", "expertise"]
+      }
+    }
   },
 
-  skills: {
-    type: "map",
-    label: "Skills",
-    options: ["none", "proficient", "expertise"]
-  },
-
+  // Attacks
   attacks: {
     type: "list",
     label: "Weapons & Attacks",
@@ -71,20 +84,29 @@ export const characterSchema = {
     }
   },
 
+  // Inventory
   inventory: {
-    type: "array",
+    type: "list",
     label: "Inventory",
     itemFields: {
       name: { type: "string", label: "Item" },
       qty: { type: "number", label: "Qty" }
     }
   },
-  //Curencty
-  platinum: { type: "number", label: "Platinum", default: 0 },
-  gold: { type: "number", label: "Gold", default: 0 },
-  silver: { type: "number", label: "Silver", default: 0 },
-  copper: { type: "number", label: "Copper", default: 0 },
 
+  // Currency
+  currency: {
+    type: "group",
+    label: "Currency",
+    fields: {
+      platinum: { type: "number", label: "Platinum", default: 0 },
+      gold: { type: "number", label: "Gold", default: 0 },
+      silver: { type: "number", label: "Silver", default: 0 },
+      copper: { type: "number", label: "Copper", default: 0 }
+    }
+  },
+
+  // Spells
   spells: {
     type: "group",
     label: "Spells",
@@ -92,20 +114,23 @@ export const characterSchema = {
       spellcasting_ability: { type: "string", label: "Spellcasting Ability" },
       spell_save_dc: { type: "number", label: "Spell Save DC" },
       spell_attack_bonus: { type: "number", label: "Spell Attack Bonus" },
-      cantrips: { type: "list", label: "Cantrips", itemFields: { name: { type: "string" } } },
-      level_1: {
-        type: "group",
-        label: "Level 1 Spells",
-        fields: {
-          slots: { type: "number", label: "Slots" },
-          used: { type: "number", label: "Used" },
-          prepared: { type: "list", label: "Prepared", itemFields: { name: { type: "string" } } }
-        }
+      cantrips: {
+        type: "list",
+        label: "Cantrips",
+        itemFields: { name: { type: "string" } }
+      },
+      level_1_slots: { type: "number", label: "Level 1 Slots" },
+      level_1_used: { type: "number", label: "Level 1 Used" },
+      level_1_prepared: {
+        type: "list",
+        label: "Level 1 Prepared",
+        itemFields: { name: { type: "string" } }
       }
-      // Repeat up to level_9
+      // 👉 Add more levels (2–9) later in the same flat way
     }
   },
 
+  // Traits
   traits: {
     type: "group",
     label: "Traits & Features",
@@ -116,6 +141,7 @@ export const characterSchema = {
     }
   },
 
+  // Character Details
   details: {
     type: "group",
     label: "Character Details",
@@ -136,13 +162,13 @@ export const characterSchema = {
     }
   },
 
+  // Death Saves
   death_saves: {
     type: "group",
     label: "Death Saves",
     fields: {
-      successes: { type: "number", label: "Successes" },
-      failures: { type: "number", label: "Failures" }
+      death_successes: { type: "number", label: "Successes" },
+      death_failures: { type: "number", label: "Failures" }
     }
   }
 };
-

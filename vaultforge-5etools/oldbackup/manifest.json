@@ -1,0 +1,11 @@
+{
+  "id": "vaultforge-5etools",
+  "name": "VaultForge-5eTools",
+  "version": "0.2.0",
+  "minAppVersion": "0.15.0",
+  "description": "Provides a SQLite 5eTools database (items, spells, monsters, etc.) with update + search utilities inside Obsidian.",
+  "author": "sliser",
+  "authorUrl": "https://github.com/sliserxp/VaultForge",
+  "isDesktopOnly": true
+}
+

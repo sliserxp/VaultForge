@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS: VaultForgeChatSettings = {
 /* ======================= Main Plugin Class ======================= */
 export default class VaultForgeChatPlugin extends Plugin {
   core: VaultForgeCoreAPI | null = null;
-  settings!: GPTChatSettings;
+  settings!: VaultForgeChatSettings;
 
   /* ---------- Lifecycle ---------- */
   async onload() {
@@ -56,9 +56,9 @@ export default class VaultForgeChatPlugin extends Plugin {
     }
 
     /* ---------- Events ---------- */
-    // Respond on save (Ctrl+S)
+    // Respond on save (Ctrl+S) — use vault "modify" (fires on save)
     this.registerEvent(
-      this.app.workspace.on("file-save", async (file) => {
+      this.app.vault.on("modify", async (file) => {
         if (file instanceof TFile && this.settings.autoRespondOnSave) {
           await this.handleNoteUpdate(file);
         }
@@ -191,9 +191,9 @@ export default class VaultForgeChatPlugin extends Plugin {
 
 /* ======================= Settings Tab ======================= */
 class GPTChatSettingTab extends PluginSettingTab {
-  plugin: GPTChatPlugin;
+  plugin: VaultForgeChatPlugin;
 
-  constructor(app: App, plugin: GPTChatPlugin) {
+  constructor(app: App, plugin: VaultForgeChatPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }

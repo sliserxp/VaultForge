@@ -75,7 +75,20 @@ export default class VaultForgeCorePlugin extends Plugin {
   vaultIndex: VaultIndexEntry[] = [];
   openai: OpenAI | null = null;
 
-  private log(...args: any[]) {   // ✅ only logs if dev mode is on
+  private resolveApiKey(): string {
+    const envKey =
+      (globalThis as any)?.process?.env?.OPENAI_API_KEY ??
+      (window as any)?.process?.env?.OPENAI_API_KEY;
+    return (envKey && String(envKey).trim()) || (this.settings.apiKey || "").trim();
+  }
+
+  private mask(key: string): string {
+    if (!key) return "";
+    if (key.length <= 10) return "********";
+    return key.slice(0, 4) + "…" + key.slice(-4);
+  }
+
+  private log(...args: any[]) {
     if (this.settings?.developerMode) {
       console.log("[VaultForge-Core]", ...args);
     }
@@ -89,10 +102,11 @@ export default class VaultForgeCorePlugin extends Plugin {
     this.addSettingTab(new VaultForgeSettingTab(this.app, this));
     this.addCommands();
 
-    this.openai = new OpenAI({
-      apiKey: this.settings.apiKey,
-      dangerouslyAllowBrowser: true,
-    });
+   const apiKey = this.resolveApiKey();
+    if (!apiKey) {
+      new Notice("⚠️ No OpenAI API key found (env or settings). Set it to enable GPT features.");
+    }
+    this.openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 
     if (!this.vaultIndex || this.vaultIndex.length === 0) {
       this.log("No index found, building fresh...");
@@ -102,9 +116,9 @@ export default class VaultForgeCorePlugin extends Plugin {
     }
 
     if (this.settings.autoRebuild) {
-      this.registerEvent(this.app.vault.on("create", () => this.buildVaultIndex()));
-      this.registerEvent(this.app.vault.on("delete", () => this.buildVaultIndex()));
-      this.registerEvent(this.app.vault.on("modify", () => this.buildVaultIndex()));
+      this.registerEvent(this.app.vault.on("create", (file) => this.buildVaultIndex()));
+      this.registerEvent(this.app.vault.on("delete", (file) => this.buildVaultIndex()));
+      this.registerEvent(this.app.vault.on("modify", (file) => this.buildVaultIndex()));
     }
   }
 
@@ -347,7 +361,11 @@ ${related}`;
     const lines = first.split("\n");
     const header = lines.find(l => l.startsWith("**")) ?? "";
     const excerptIdx = lines.findIndex(l => l.startsWith("Excerpt:"));
-    const excerpt = excerptIdx >= 0 ? lines.slice(excerptIdx, excerptIdx + 3).join("\n") : "";
+    let excerpt = excerptIdx >= 0 ? lines.slice(excerptIdx, excerptIdx + 3).join("\n") : "";
+    const max = 500;
+    if (excerpt.length > max) {
+      excerpt = excerpt.slice(0, max) + "...";
+    }
     return [header, excerpt].filter(Boolean).join("\n");
   }
 

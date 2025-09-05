@@ -1,0 +1,14 @@
+{
+  "name": "gpt5-plugin",
+  "version": "1.0.0",
+  "description": "Obsidian GPT-5 Worldbuilder Plugin",
+  "main": "main.js",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
+

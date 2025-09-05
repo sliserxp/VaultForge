@@ -1,0 +1,20 @@
+{
+  "name": "vaultforge-5etools",
+  "version": "0.3.0",
+  "description": "VaultForge plugin for browsing and searching the 5eTools dataset inside Obsidian.",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "esbuild main.ts --bundle --outfile=main.js --platform=node --external:obsidian --format=cjs --loader:.wasm=binary",
+    "dev": "esbuild main.ts --bundle --outfile=main.js --platform=node --external:obsidian --format=cjs --loader:.wasm=binary --watch"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.12",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9",
+    "typescript": "^5.4.0"
+  }
+}
+

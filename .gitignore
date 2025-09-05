@@ -14,6 +14,7 @@ build/
 .obsidian/plugins/gpt5-plugin
 .obsidian/plugins/VoiceActor
 .obsidian/plugins/vaultforge-5etools/data/** 
+.obsidian/plugins/vaultforge-5etools/oldbackup/**
 
 # Env / secrets
 .env
@@ -27,3 +28,4 @@ continue/config.json
 
 vaultforge-core/data.json
 sql-wasm.wasm
+vaultforge-5etools/5etools.db

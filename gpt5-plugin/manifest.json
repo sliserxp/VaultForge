@@ -1,0 +1,10 @@
+{
+  "id": "gpt5-plugin",
+  "name": "GPT-5 Worldbuilder",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Worldbuilding and dialogue assistant with GPT-5 integration.",
+  "author": "Sliser & ChatGPT",
+  "main": "main.js"
+}
+

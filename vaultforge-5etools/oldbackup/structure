@@ -1,0 +1,13 @@
+vaultforge-5etools/
+├─ main.ts
+├─ manifest.json
+├─ package.json
+├─ tsconfig.json
+├─ importer.ts       # build DB from JSON
+├─ utils/
+│  ├─ normalize.ts
+│  ├─ search.ts
+│  └─ index.ts
+├─ styles.css
+└─ 5etools.db       # the actual dataset
+

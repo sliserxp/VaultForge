@@ -6504,6 +6504,15 @@ var VaultForgeCorePlugin = class extends import_obsidian.Plugin {
     this.vaultIndex = [];
     this.openai = null;
   }
+  resolveApiKey() {
+    const envKey = globalThis?.process?.env?.OPENAI_API_KEY ?? window?.process?.env?.OPENAI_API_KEY;
+    return envKey && String(envKey).trim() || (this.settings.apiKey || "").trim();
+  }
+  mask(key) {
+    if (!key) return "";
+    if (key.length <= 10) return "********";
+    return key.slice(0, 4) + "\u2026" + key.slice(-4);
+  }
   log(...args) {
     if (this.settings?.developerMode) {
       console.log("[VaultForge-Core]", ...args);
@@ -6515,10 +6524,11 @@ var VaultForgeCorePlugin = class extends import_obsidian.Plugin {
     await this.loadVaultIndex();
     this.addSettingTab(new VaultForgeSettingTab(this.app, this));
     this.addCommands();
-    this.openai = new OpenAI({
-      apiKey: this.settings.apiKey,
-      dangerouslyAllowBrowser: true
-    });
+    const apiKey = this.resolveApiKey();
+    if (!apiKey) {
+      new import_obsidian.Notice("\u26A0\uFE0F No OpenAI API key found (env or settings). Set it to enable GPT features.");
+    }
+    this.openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
     if (!this.vaultIndex || this.vaultIndex.length === 0) {
       this.log("No index found, building fresh...");
       await this.buildVaultIndex();
@@ -6526,9 +6536,9 @@ var VaultForgeCorePlugin = class extends import_obsidian.Plugin {
       this.log(`Loaded cached index (${this.vaultIndex.length} entries).`);
     }
     if (this.settings.autoRebuild) {
-      this.registerEvent(this.app.vault.on("create", () => this.buildVaultIndex()));
-      this.registerEvent(this.app.vault.on("delete", () => this.buildVaultIndex()));
-      this.registerEvent(this.app.vault.on("modify", () => this.buildVaultIndex()));
+      this.registerEvent(this.app.vault.on("create", (file) => this.buildVaultIndex()));
+      this.registerEvent(this.app.vault.on("delete", (file) => this.buildVaultIndex()));
+      this.registerEvent(this.app.vault.on("modify", (file) => this.buildVaultIndex()));
     }
   }
   /* ---------- Commands ---------- */
@@ -6714,7 +6724,11 @@ ${related}`;
     const lines = first.split("\n");
     const header = lines.find((l) => l.startsWith("**")) ?? "";
     const excerptIdx = lines.findIndex((l) => l.startsWith("Excerpt:"));
-    const excerpt = excerptIdx >= 0 ? lines.slice(excerptIdx, excerptIdx + 3).join("\n") : "";
+    let excerpt = excerptIdx >= 0 ? lines.slice(excerptIdx, excerptIdx + 3).join("\n") : "";
+    const max = 500;
+    if (excerpt.length > max) {
+      excerpt = excerpt.slice(0, max) + "...";
+    }
     return [header, excerpt].filter(Boolean).join("\n");
   }
   /* ---------- Vault Index ---------- */

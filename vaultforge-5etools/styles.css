@@ -1,0 +1,11 @@
+/* VaultForge-5eTools styling */
+.vf-5etools-result {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.vf-5etools-result:hover {
+  background-color: var(--background-modifier-hover);
+  cursor: pointer;
+}
+

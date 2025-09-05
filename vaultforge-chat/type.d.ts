@@ -11,11 +11,11 @@ declare global {
   }
 }
 
-// API contract that GPT-Core exposes for other plugins
-export interface GPTCoreAPI {
+// API contract that VaultForge-Core exposes for other plugins
+export interface VaultForgeCoreAPI {
   chat(messages: { role: "system" | "user" | "assistant"; content: string }[]): Promise<string>;
   askVault(query: string): Promise<string>;
-  askVaultConsise?(query: string): Promise<string>;
+  askVaultConcise?(query: string): Promise<string>;
 }
 
 

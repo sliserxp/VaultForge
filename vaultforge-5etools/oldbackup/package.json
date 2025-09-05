@@ -1,0 +1,20 @@
+{
+  "name": "vaultforge-5etools",
+  "version": "0.2.0",
+  "description": "VaultForge plugin for 5eTools dataset stored in SQLite (portable with sql.js).",
+  "main": "main.js",
+  "type": "module",
+  "dependencies": {
+    "adm-zip": "^0.5.12",
+    "sql.js": "^1.13.0"
+  },
+  "scripts": {
+    "build": "esbuild main.ts --bundle --outfile=main.js --platform=node --external:obsidian --external:fs --external:path --format=cjs --resolve-extensions=.ts,.js,.json",
+    "dev": "esbuild main.ts --bundle --outfile=main.js --platform=node --external:obsidian --external:fs --external:path --format=cjs --resolve-extensions=.ts,.js,.json --watch",
+    "postbuild": "cp ./node_modules/sql.js/dist/sql-wasm.wasm ~/ObsidianVault/.obsidian/plugins/vaultforge-5etools/"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9",
+    "typescript": "^5.4.0"
+  }
+}

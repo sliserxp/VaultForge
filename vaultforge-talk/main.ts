@@ -11,6 +11,7 @@ import {
   Modal,
   WorkspaceLeaf,
   requestUrl,
+  parseYaml,
 } from "obsidian";
 import OpenAI from "openai";
 
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: VaultForgeTalkSettings = {
 export default class VaultForgeTalk extends Plugin {
   settings!: VaultForgeTalkSettings;
   client!: OpenAI;
+  npcRegistry: Record<string, { id:string; voice:string; style?:string; persona?:string; tts?: { rate?: string; pitch?: string; prePauseMs?: number; postPauseMs?: number; phonemes?: string } }> = {};
 
   async onload() {
     console.log("VaultForge-Talk loaded");
@@ -90,11 +92,42 @@ export default class VaultForgeTalk extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
+    this.npcRegistry = (data && (data as any).npcs) || {};
   }
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    await this.saveData({ ...this.settings, npcs: this.npcRegistry });
+  }
+
+  async saveNpcRegistry() {
+    await this.saveData({ ...this.settings, npcs: this.npcRegistry });
+  }
+
+  getNpcFiles(): string[] {
+    const files = this.app.vault.getMarkdownFiles();
+    const list = files
+      .filter(f => {
+        const top = f.path.split('/')[0].toLowerCase();
+        return top === 'npcs' || top === 'npc' || f.path.toLowerCase().includes('/npcs/');
+      })
+      .map(f => f.basename);
+    return list;
+  }
+
+  findNpcFileByBasename(basename: string) {
+    const files = this.app.vault.getMarkdownFiles();
+    return files.find(f => f.basename === basename) || null;
+  }
+
+  getNpcProfile(id: string) {
+    return this.npcRegistry[id] || { id, voice: this.settings.defaultVoice, style: '', persona: '' };
+  }
+
+  setNpcProfile(id: string, profile: { voice: string; style?: string; persona?: string }) {
+    this.npcRegistry[id] = { id, voice: profile.voice, style: profile.style || '', persona: profile.persona || '' };
+    return this.saveNpcRegistry();
   }
 
   async activateView() {
@@ -110,13 +143,25 @@ export default class VaultForgeTalk extends Plugin {
 
   async playTTS(npcName: string, text: string) {
   try {
-    const voice = this.settings.defaultVoice || "alloy";
+    const profile = this.getNpcProfile(npcName);
+    const voice = profile?.voice || this.settings.defaultVoice || "alloy";
     console.log(`[VaultForge-Talk] Playing TTS for ${npcName} with voice: ${voice}`);
+
+    // Build SSML from profile tts settings if available
+    const tts = profile.tts || {};
+    let ssml = text;
+    if (tts) {
+      const pre = tts.prePauseMs ? `<break time="${tts.prePauseMs}ms"/>` : "";
+      const post = tts.postPauseMs ? `<break time="${tts.postPauseMs}ms"/>` : "";
+      const prosody = ` rate=\"${tts.rate || '1.0'}\" pitch=\"${tts.pitch || '0%'}\"`;
+      ssml = `<speak>${pre}<prosody ${prosody}>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</prosody>${post}</speak>`;
+    }
 
     const response = await this.client.audio.speech.create({
       model: "gpt-4o-mini-tts",
       voice,
-      input: text,
+      input: ssml,
+      format: "mp3",
     });
 
     const arrayBuffer = await response.arrayBuffer();
@@ -142,8 +187,11 @@ export default class VaultForgeTalk extends Plugin {
       console.warn("[VaultForge-Talk] Could not find askVault on Core");
     }
 
-    const systemPrompt = `You are ${npcName}. Stay in character at all times.
-      Here is what you know about yourself and the world:\n${context}`;
+    const profile = this.getNpcProfile(npcName);
+    const personaBlock = profile.persona ? `Persona: ${profile.persona}\n` : "";
+    const styleBlock = profile.style ? `Style: ${profile.style}\n` : "";
+
+    const systemPrompt = `You are ${npcName}. Stay in character at all times.\n${personaBlock}${styleBlock}Here is what you know about yourself and the world:\n${context}`;
 
     const completion = await this.client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -158,7 +206,7 @@ export default class VaultForgeTalk extends Plugin {
     await this.saveTranscript(npcName, playerLine, npcReply);
 
     if (this.settings.autoplay) {
-      await this.playTTS(npcName, npcReply);  // make sure playTTS is a method of the class
+      await this.playTTS(npcName, npcReply);
     }
 
     return npcReply;
@@ -249,6 +297,95 @@ class PromptModal extends Modal {
   }
 }
 
+/* ---------- NPC Edit Modal ---------- */
+class NPCEditModal extends Modal {
+  plugin: VaultForgeTalk;
+  npcId: string;
+  constructor(app: App, plugin: VaultForgeTalk, npcId: string) {
+    super(app);
+    this.plugin = plugin;
+    this.npcId = npcId;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl('h2', { text: `Edit NPC: ${this.npcId}` });
+    const profile = this.plugin.getNpcProfile(this.npcId);
+
+    // Voice
+    const voiceSetting = contentEl.createEl('div', { attr: { style: 'margin-bottom:8px;' } });
+    voiceSetting.createEl('label', { text: 'Voice:' });
+    const voiceDropdown = voiceSetting.createEl('select');
+    ['alloy','verse','lumen','echo','flow'].forEach(v => {
+      const opt = document.createElement('option'); opt.value = v; opt.text = v; if (profile.voice === v) opt.selected = true; voiceDropdown.appendChild(opt);
+    });
+
+    // Style
+    contentEl.createEl('div', { attr: { style: 'margin-top:8px;' } }).createEl('label', { text: 'Style (short):' });
+    const styleInput = contentEl.createEl('textarea'); styleInput.value = profile.style || '';
+    styleInput.rows = 2;
+
+    // Persona
+    contentEl.createEl('div', { attr: { style: 'margin-top:8px;' } }).createEl('label', { text: 'Persona (longer):' });
+    const personaInput = contentEl.createEl('textarea'); personaInput.value = profile.persona || '';
+    personaInput.rows = 4;
+
+    // TTS settings
+    contentEl.createEl('div', { attr: { style: 'margin-top:8px;' } }).createEl('h4', { text: 'TTS Settings' });
+    const ttsRow = contentEl.createEl('div', { attr: { style: 'display:flex; gap:8px; align-items:center;' } });
+    // rate
+    const rateLabel = ttsRow.createEl('label', { text: 'Rate:' });
+    const rateInput = ttsRow.createEl('input'); rateInput.type = 'text'; rateInput.value = profile.tts?.rate || '1.0'; rateInput.style.width = '80px';
+    // pitch
+    const pitchLabel = ttsRow.createEl('label', { text: 'Pitch:' });
+    const pitchInput = ttsRow.createEl('input'); pitchInput.type = 'text'; pitchInput.value = profile.tts?.pitch || '0%'; pitchInput.style.width = '80px';
+    // pre/post pause
+    const preLabel = ttsRow.createEl('label', { text: 'PrePause(ms):' });
+    const preInput = ttsRow.createEl('input'); preInput.type = 'number'; preInput.value = (profile.tts?.prePauseMs || 0).toString(); preInput.style.width = '80px';
+    const postLabel = ttsRow.createEl('label', { text: 'PostPause(ms):' });
+    const postInput = ttsRow.createEl('input'); postInput.type = 'number'; postInput.value = (profile.tts?.postPauseMs || 0).toString(); postInput.style.width = '80px';
+
+    // phonemes / overrides
+    contentEl.createEl('div', { attr: { style: 'margin-top:8px;' } }).createEl('label', { text: 'Phoneme overrides / notes:' });
+    const phonemesInput = contentEl.createEl('textarea'); phonemesInput.value = profile.tts?.phonemes || ''; phonemesInput.rows = 2;
+
+    const btnBar = contentEl.createEl('div', { attr: { style: 'display:flex; gap:8px; margin-top:8px;' } });
+    const loadBtn = btnBar.createEl('button', { text: 'Load from Note' });
+    loadBtn.addEventListener('click', async () => {
+      const file = this.plugin.findNpcFileByBasename(this.npcId);
+      if (!file) { new Notice('NPC note not found'); return; }
+      const content = await this.plugin.app.vault.read(file);
+      const fm = content.match(/^---\n([\s\S]*?)\n---/);
+      if (!fm) { new Notice('No frontmatter in note'); return; }
+      try {
+        const data = parseYaml(fm[1]);
+        const npc = data?.npc || data;
+        if (!npc) { new Notice('No npc block in frontmatter'); return; }
+        if (npc.voice) voiceDropdown.value = npc.voice;
+        if (npc.style) styleInput.value = npc.style;
+        if (npc.persona) personaInput.value = npc.persona;
+        if (npc.tts) { rateInput.value = npc.tts.rate || rateInput.value; pitchInput.value = npc.tts.pitch || pitchInput.value; preInput.value = (npc.tts.prePauseMs || preInput.value) + ''; postInput.value = (npc.tts.postPauseMs || postInput.value) + ''; phonemesInput.value = npc.tts.phonemes || phonemesInput.value; }
+        new Notice('Loaded from note');
+      } catch (e) {
+        new Notice('Failed to parse frontmatter');
+      }
+    });
+
+    const saveBtn = btnBar.createEl('button', { text: 'Save' });
+    saveBtn.addEventListener('click', async () => {
+      await this.plugin.setNpcProfile(this.npcId, { voice: voiceDropdown.value, style: styleInput.value, persona: personaInput.value });
+      // also save tts settings
+      const tts = { rate: rateInput.value, pitch: pitchInput.value, prePauseMs: parseInt(preInput.value) || 0, postPauseMs: parseInt(postInput.value) || 0, phonemes: phonemesInput.value };
+      this.plugin.npcRegistry[this.npcId].tts = tts;
+      await this.plugin.saveNpcRegistry();
+      new Notice('NPC profile saved');
+      this.close();
+    });
+    const cancelBtn = btnBar.createEl('button', { text: 'Cancel' });
+    cancelBtn.addEventListener('click', () => this.close());
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
 /* ---------- Settings Tab ---------- */
 class VaultForgeTalkSettingTab extends PluginSettingTab {
   plugin: VaultForgeTalk;
@@ -325,6 +462,90 @@ class VaultForgeTalkSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    /* ----- NPC Registry Editor (inline) ----- */
+    containerEl.createEl('h3', { text: 'NPC Registry' });
+
+    // Selector
+    const plugin = this.plugin;
+    const files = plugin.getNpcFiles();
+    const opts: Record<string,string> = { '': '-- Select NPC --' };
+    files.forEach(f => opts[f] = f);
+
+    const selectorSetting = new Setting(containerEl)
+      .setName('Select NPC')
+      .setDesc('Choose NPC note (basename) to edit runtime profile')
+      .addDropdown((dropdown) => {
+        dropdown.addOptions(opts).setValue('');
+        dropdown.onChange((value) => {
+          renderEditor(value);
+        });
+      });
+
+    const editorContainer = containerEl.createEl('div', { attr: { style: 'margin-top:8px; padding:8px; border:1px solid var(--background-modifier-border); border-radius:4px;' } });
+
+    function clearEditor() {
+      editorContainer.empty();
+      editorContainer.createEl('div', { text: 'Select an NPC to edit its profile.' });
+    }
+
+    clearEditor();
+
+    function renderEditor(npcId: string) {
+      editorContainer.empty();
+      if (!npcId) { clearEditor(); return; }
+      const profile = (plugin.getNpcProfile(npcId) as any) || { id: npcId, voice: plugin.settings.defaultVoice, style: '', persona: '', tts: {} };
+
+      // Voice
+      const voiceRow = editorContainer.createEl('div', { attr: { style: 'margin-bottom:6px; display:flex; gap:8px; align-items:center;' } });
+      voiceRow.createEl('label', { text: 'Voice:' });
+      const voiceSelect = voiceRow.createEl('select');
+      ['alloy','verse','lumen','echo','flow'].forEach(v => { const opt = document.createElement('option'); opt.value = v; opt.text = v; if (profile.voice === v) opt.selected = true; voiceSelect.appendChild(opt); });
+
+      // Style
+      editorContainer.createEl('div', { attr: { style: 'margin-top:6px;' } }).createEl('label', { text: 'Style (short):' });
+      const styleField = editorContainer.createEl('textarea'); styleField.rows = 2; styleField.value = profile.style || '';
+
+      // Persona
+      editorContainer.createEl('div', { attr: { style: 'margin-top:6px;' } }).createEl('label', { text: 'Persona (longer):' });
+      const personaField = editorContainer.createEl('textarea'); personaField.rows = 4; personaField.value = profile.persona || '';
+
+      // TTS
+      editorContainer.createEl('div', { attr: { style: 'margin-top:6px;' } }).createEl('h4', { text: 'TTS Settings' });
+      const ttsRow = editorContainer.createEl('div', { attr: { style: 'display:flex; gap:8px; align-items:center;' } });
+      ttsRow.createEl('label', { text: 'Rate:' }); const rateInput = ttsRow.createEl('input'); rateInput.type = 'text'; rateInput.value = profile.tts?.rate || '1.0'; rateInput.style.width = '80px';
+      ttsRow.createEl('label', { text: 'Pitch:' }); const pitchInput = ttsRow.createEl('input'); pitchInput.type = 'text'; pitchInput.value = profile.tts?.pitch || '0%'; pitchInput.style.width = '80px';
+      ttsRow.createEl('label', { text: 'Pre(ms):' }); const preInput = ttsRow.createEl('input'); preInput.type = 'number'; preInput.value = (profile.tts?.prePauseMs || 0).toString(); preInput.style.width = '80px';
+      ttsRow.createEl('label', { text: 'Post(ms):' }); const postInput = ttsRow.createEl('input'); postInput.type = 'number'; postInput.value = (profile.tts?.postPauseMs || 0).toString(); postInput.style.width = '80px';
+
+      editorContainer.createEl('div', { attr: { style: 'margin-top:6px;' } }).createEl('label', { text: 'Phonemes / notes:' });
+      const phonemeField = editorContainer.createEl('textarea'); phonemeField.rows = 2; phonemeField.value = profile.tts?.phonemes || '';
+
+      // Buttons
+      const btns = editorContainer.createEl('div', { attr: { style: 'display:flex; gap:8px; margin-top:8px;' } });
+      const saveBtn = btns.createEl('button', { text: 'Save' });
+      const previewBtn = btns.createEl('button', { text: 'Preview' });
+
+      saveBtn.addEventListener('click', async () => {
+        const newProfile = { voice: voiceSelect.value, style: styleField.value, persona: personaField.value };
+        await plugin.setNpcProfile(npcId, newProfile);
+        plugin.npcRegistry[npcId].tts = { rate: rateInput.value, pitch: pitchInput.value, prePauseMs: parseInt(preInput.value) || 0, postPauseMs: parseInt(postInput.value) || 0, phonemes: phonemeField.value };
+        await plugin.saveNpcRegistry();
+        new Notice('NPC profile saved');
+      });
+
+      previewBtn.addEventListener('click', async () => {
+        // construct temp profile for preview without saving
+        const temp = { id: npcId, voice: voiceSelect.value, style: styleField.value, persona: personaField.value, tts: { rate: rateInput.value, pitch: pitchInput.value, prePauseMs: parseInt(preInput.value) || 0, postPauseMs: parseInt(postInput.value) || 0, phonemes: phonemeField.value } } as any;
+        const original = plugin.npcRegistry[npcId];
+        plugin.npcRegistry[npcId] = temp;
+        await plugin.playTTS(npcId, 'Vault Forge, can be EXPRESSIVE!');
+        // restore original after short delay to avoid race
+        setTimeout(() => { if (original) plugin.npcRegistry[npcId] = original; else delete plugin.npcRegistry[npcId]; }, 2000);
+      });
+
+    }
+
   }
 }
 
