@@ -1,4 +1,5 @@
 *disclaimer* i have no idea what im doing.
+(you'll need your own openai api keys)
 
 however welcome to vault forge project that im making to use obsidian for my main d&d platform
 
