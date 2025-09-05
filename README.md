@@ -8,3 +8,19 @@ VaultForge-Player : Player side character sheet, invintory, spells, shops, maps,
 
 Trying to learn coding by doing with help in VScodium and ChatGPT, and ChatGPT-API. 
 thanks for checking it out.
+
+Attribution
+
+This project makes use of data from 5etools, an open-source resource for Dungeons & Dragons 5th Edition.
+
+5etools License: The code and data provided by 5etools are licensed under the MIT License.
+
+Credit: All credit for the 5e data compilation and toolset goes to the 5etools community and contributors.
+
+Disclaimer:
+
+This project is not affiliated with, endorsed, or sponsored by Wizards of the Coast (WotC) or 5etools.
+
+All Dungeons & Dragons content is the property of Wizards of the Coast.
+
+This project is provided for personal/fan use only.
