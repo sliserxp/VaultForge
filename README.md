@@ -12,6 +12,15 @@ VaultForge-5eTools : 5etools repo used in a way that is databased with sql and c
 
 VaultForge-Player : Player side character sheet, invintory, spells, shops, maps, and handouts. using server through obsidian and qr code for access. updates to obsisian file yaml.
 
+VaultForge-generate : [placeholder] tool to find and recommend context holes in game to fill and autogen missing context/links/tags on already existing lore. generate from template using vault context.
+
+VaultForge-Map : [placeholder] tool to generate maps using context, auto label, and update based on context. 
+
+vault's structure in mind 
+[vault]>[(npcs),(locations),(story),(players),(quest),(ect)] this is what i used when built.
+
+5etools database /data was used to construct the 5etools.db with meta tags (yaml update coming)
+
 Trying to learn coding by doing with help in VScodium and ChatGPT, and ChatGPT-API. 
 thanks for checking it out.
 
