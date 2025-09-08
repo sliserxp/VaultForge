@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import items from "./data/items/items.json";
 
 export interface VFItem {
   name: string;
@@ -35,6 +34,9 @@ interface ShopViewProps {
   gold: number;
   coins?: { platinum: number; gold: number; silver: number; copper: number };
   onBuy: (item: VFItem) => void;
+  player: any; // Assuming you have access to the player object
+  selected: string; // The selected player's name
+  updatePlayer: (updates: any) => Promise<void>; // Function to update player
 }
 
 /* ---------- Category definitions ---------- */
@@ -98,20 +100,60 @@ const typeLabels: Record<string, string> = {
   TG: "Trade Good",
 };
 
-export default function ShopView({ gold, coins, onBuy }: ShopViewProps) {
+export default function ShopView({ gold, coins, onBuy, player, selected, updatePlayer }: ShopViewProps) {
   const [allItems, setAllItems] = useState<VFItem[]>([]);
   const [query, setQuery] = useState("");
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
-  const [currentSubCategory, setCurrentSubCategory] = useState<string | null>(
-    null
-  );
+  const [currentSubCategory, setCurrentSubCategory] = useState<string | null>(null);
 
   useEffect(() => {
-    let raw: any[] = [];
-    if (Array.isArray(items)) raw = items as any[];
-    else if ((items as any).item) raw = (items as any).item;
-    setAllItems(raw.map(toVFItem));
+    fetch("/api/items")
+      .then(response => response.json())
+      .then(data => setAllItems(data.map(toVFItem)))
+      .catch(err => console.error("Failed to load items from API", err));
   }, []);
+
+  // Helper: convert player coins object -> decimal gp
+  function coinsToGoldDecimal(p: any): number {
+    if (!p) return 0;
+    return (
+      (p.platinum ?? 0) * 10 +
+      (p.gold ?? 0) +
+      (p.silver ?? 0) / 10 +
+      (p.copper ?? 0) / 100
+    );
+  }
+
+  // Helper: convert decimal gp -> coins object (pp, gp, sp, cp)
+  function goldDecimalToCoins(totalGold: number) {
+    let cp = Math.round(totalGold * 100);
+    const platinum = Math.floor(cp / 1000);
+    cp -= platinum * 1000;
+    const gold = Math.floor(cp / 100);
+    cp -= gold * 100;
+    const silver = Math.floor(cp / 10);
+    cp -= silver * 10;
+    const copper = cp;
+    return { platinum, gold, silver, copper };
+  }
+
+  function handleBuy(item: VFItem) {
+    const cost = item.cost ? item.cost : 0; // Ensure cost is defined
+    const totalGold = coinsToGoldDecimal(player); // Assuming you have access to the player object
+
+    if (totalGold >= cost) {
+      const remaining = totalGold - cost;
+      const newCoins = goldDecimalToCoins(remaining);
+
+      // Update the player's inventory
+      updatePlayer({
+        ...newCoins,
+        inventory: [...(player.inventory ?? []), item], // Add the purchased item
+      });
+    } else {
+      alert("Not enough money!");
+    }
+  }
 
   /* ---------- Filter ---------- */
   let displayItems: VFItem[] = [];
@@ -235,7 +277,7 @@ export default function ShopView({ gold, coins, onBuy }: ShopViewProps) {
                 </p>
                 <button
                   className="mt-2 px-3 py-1 bg-green-600 text-white rounded"
-                  onClick={() => onBuy(item)}
+                  onClick={() => handleBuy(item)} // Call handleBuy on click
                 >
                   Buy
                 </button>
