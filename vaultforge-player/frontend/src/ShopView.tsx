@@ -19,7 +19,8 @@ function toVFItem(raw: any): VFItem {
     name: raw.name,
     type: raw.type || "gear",
     rarity: raw.rarity || "common",
-    cost: raw.value ? raw.value / 100 : 0, // cp → gp
+    // normalized.value from 5etools is already in gp (or a numeric score). Use it directly.
+    cost: raw.value ?? 0,
     weight: raw.weight || 0,
     source: raw.source || "Unknown",
     poison: raw.poison,

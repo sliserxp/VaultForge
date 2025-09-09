@@ -201,6 +201,11 @@ export function normalizeAny(raw: any) {
     attunement: raw.reqAttune ?? null,
     level: raw.level ?? null,
     school: raw.school ?? null,
+    // Tags for categorization/search (prefer explicit tags, fall back to type/subtype)
+    tags: (() => {
+      const t = raw.tags ?? raw.type ?? raw.subtype ?? [];
+      return Array.isArray(t) ? t : [t];
+    })(),
   };
 
   normalized.strength = scoreEntry(normalized);
@@ -227,9 +232,9 @@ async function initDb() {
   return SQL;
 }
 
-export async function loadDatabase(dbPath: string): Promise<Database> {
+export async function loadDatabase(dbPath: string, force: boolean = false): Promise<Database> {
   console.log(`[VaultForge-5eTools] Attempting to load DB: ${dbPath}`);
-  if (db) return db;
+  if (db && !force) return db;
   const SQL = await initDb();
   const fileBuffer = fs.readFileSync(dbPath);
   db = new SQL.Database(fileBuffer);
@@ -290,6 +295,32 @@ export function indexTable(db: Database, table: string): any[] {
   }
   stmt.free();
   return rows;
+}
+
+// Append a single JSON-normalized object into a table and persist the DB file.
+// This helper enables runtime additions (e.g., adding shop items/tags from UI).
+export async function appendToDatabase(table: string, obj: any, dbPath: string) {
+  const SQL = await initDb();
+  let localDb: Database;
+  if (fs.existsSync(dbPath)) {
+    const buf = fs.readFileSync(dbPath);
+    localDb = new SQL.Database(buf);
+  } else {
+    localDb = new SQL.Database();
+  }
+
+  try {
+    // Ensure table exists and insert
+    localDb.run(`CREATE TABLE IF NOT EXISTS ${table} (data TEXT)`);
+    localDb.run(`INSERT INTO ${table} VALUES (?)`, [JSON.stringify(obj)]);
+
+    // Persist back to disk
+    const out = Buffer.from(localDb.export());
+    fs.writeFileSync(dbPath, out);
+  } catch (e) {
+    console.error("[VaultForge-5eTools] appendToDatabase failed:", e);
+    throw e;
+  }
 }
 
 async function rebuildDatabase(plugin: VaultForge5eTools) {
@@ -461,6 +492,25 @@ export default class VaultForge5eTools extends Plugin {
       console.error("Failed to init DB:", err);
       new Notice("VaultForge-5eTools failed to init DB.");
     }
+    
+    // Expose a lightweight API for other plugins (e.g., vaultforge-player) to read/modify tables.
+    // Usage from another plugin: const vf = (app as any).vaultforge5etools; vf?.getTable('items')
+    (this.app as any).vaultforge5etools = {
+      getTable: (table: string) => (db ? indexTable(db, table) : []),
+      searchName: (q: string, type: string = "all") => search(q, type as any),
+      appendToDatabase: async (table: string, obj: any) => {
+        try {
+          const p = pluginPath(this, this.settings.dbPath);
+          await appendToDatabase(table, obj, p);
+          // reload in-memory DB (force reload to pick up appended row)
+          db = await loadDatabase(p, true);
+          return { success: true };
+        } catch (e) {
+          console.error("[VaultForge-5eTools] appendToDatabase failed via API:", e);
+          return { success: false, error: String(e) };
+        }
+      },
+    };
 
     this.addCommand({
       id: "5etools-search",

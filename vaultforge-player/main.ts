@@ -126,6 +126,17 @@ export default class VaultForgePlayer extends Plugin {
     );
     app.use("/", express.static(distPath));
 
+    app.get("/api/items", async (_req: Request, res: Response) => {
+      try {
+        const vf = (this.app as any).vaultforge5etools;
+        const items = vf ? vf.getTable('items') : [];
+        res.json(items);
+      } catch (err) {
+        console.error("[VaultForge-Player] Error fetching items:", err);
+        res.status(500).json({ error: "Failed to load items" });
+      }
+    });
+
     /* ---- List players ---- */
     app.get("/api/players", async (_req: Request, res: Response) => {
       try {
