@@ -48,7 +48,7 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
       return;
     }
     this.registerEvent(
-      this.app.workspace.on("file-save", async (file) => {
+      this.app.vault.on("modify", async (file) => {
         if (file instanceof import_obsidian.TFile && this.settings.autoRespondOnSave) {
           await this.handleNoteUpdate(file);
         }

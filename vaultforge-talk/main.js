@@ -13045,6 +13045,10 @@ var DEFAULT_SETTINGS = {
   transcriptMode: "transcript"
 };
 var VaultForgeTalk = class extends import_obsidian.Plugin {
+  constructor() {
+    super(...arguments);
+    this.npcRegistry = {};
+  }
   async onload() {
     console.log("VaultForge-Talk loaded");
     await this.loadSettings();
@@ -13087,10 +13091,34 @@ var VaultForgeTalk = class extends import_obsidian.Plugin {
     this.app.workspace.detachLeavesOfType(VaultForgeTalkView.VIEW_TYPE);
   }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
+    this.npcRegistry = data && data.npcs || {};
   }
   async saveSettings() {
-    await this.saveData(this.settings);
+    await this.saveData({ ...this.settings, npcs: this.npcRegistry });
+  }
+  async saveNpcRegistry() {
+    await this.saveData({ ...this.settings, npcs: this.npcRegistry });
+  }
+  getNpcFiles() {
+    const files = this.app.vault.getMarkdownFiles();
+    const list = files.filter((f2) => {
+      const top = f2.path.split("/")[0].toLowerCase();
+      return top === "npcs" || top === "npc" || f2.path.toLowerCase().includes("/npcs/");
+    }).map((f2) => f2.basename);
+    return list;
+  }
+  findNpcFileByBasename(basename2) {
+    const files = this.app.vault.getMarkdownFiles();
+    return files.find((f2) => f2.basename === basename2) || null;
+  }
+  getNpcProfile(id) {
+    return this.npcRegistry[id] || { id, voice: this.settings.defaultVoice, style: "", persona: "" };
+  }
+  setNpcProfile(id, profile) {
+    this.npcRegistry[id] = { id, voice: profile.voice, style: profile.style || "", persona: profile.persona || "" };
+    return this.saveNpcRegistry();
   }
   async activateView() {
     this.app.workspace.detachLeavesOfType(VaultForgeTalkView.VIEW_TYPE);
@@ -13104,12 +13132,22 @@ var VaultForgeTalk = class extends import_obsidian.Plugin {
   }
   async playTTS(npcName, text) {
     try {
-      const voice = this.settings.defaultVoice || "alloy";
+      const profile = this.getNpcProfile(npcName);
+      const voice = profile?.voice || this.settings.defaultVoice || "alloy";
       console.log(`[VaultForge-Talk] Playing TTS for ${npcName} with voice: ${voice}`);
+      const tts = profile.tts || {};
+      let ssml = text;
+      if (tts) {
+        const pre = tts.prePauseMs ? `<break time="${tts.prePauseMs}ms"/>` : "";
+        const post = tts.postPauseMs ? `<break time="${tts.postPauseMs}ms"/>` : "";
+        const prosody = ` rate="${tts.rate || "1.0"}" pitch="${tts.pitch || "0%"}"`;
+        ssml = `<speak>${pre}<prosody ${prosody}>${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</prosody>${post}</speak>`;
+      }
       const response = await this.client.audio.speech.create({
         model: "gpt-4o-mini-tts",
         voice,
-        input: text
+        input: ssml,
+        format: "mp3"
       });
       const arrayBuffer = await response.arrayBuffer();
       const blob = new Blob([arrayBuffer], { type: "audio/mpeg" });
@@ -13131,8 +13169,13 @@ var VaultForgeTalk = class extends import_obsidian.Plugin {
       } else {
         console.warn("[VaultForge-Talk] Could not find askVault on Core");
       }
+      const profile = this.getNpcProfile(npcName);
+      const personaBlock = profile.persona ? `Persona: ${profile.persona}
+` : "";
+      const styleBlock = profile.style ? `Style: ${profile.style}
+` : "";
       const systemPrompt = `You are ${npcName}. Stay in character at all times.
-      Here is what you know about yourself and the world:
+${personaBlock}${styleBlock}Here is what you know about yourself and the world:
 ${context}`;
       const completion = await this.client.chat.completions.create({
         model: "gpt-4o-mini",
@@ -13268,6 +13311,95 @@ var VaultForgeTalkSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    containerEl.createEl("h3", { text: "NPC Registry" });
+    const plugin = this.plugin;
+    const files = plugin.getNpcFiles();
+    const opts = { "": "-- Select NPC --" };
+    files.forEach((f2) => opts[f2] = f2);
+    const selectorSetting = new import_obsidian.Setting(containerEl).setName("Select NPC").setDesc("Choose NPC note (basename) to edit runtime profile").addDropdown((dropdown) => {
+      dropdown.addOptions(opts).setValue("");
+      dropdown.onChange((value) => {
+        renderEditor(value);
+      });
+    });
+    const editorContainer = containerEl.createEl("div", { attr: { style: "margin-top:8px; padding:8px; border:1px solid var(--background-modifier-border); border-radius:4px;" } });
+    function clearEditor() {
+      editorContainer.empty();
+      editorContainer.createEl("div", { text: "Select an NPC to edit its profile." });
+    }
+    clearEditor();
+    function renderEditor(npcId) {
+      editorContainer.empty();
+      if (!npcId) {
+        clearEditor();
+        return;
+      }
+      const profile = plugin.getNpcProfile(npcId) || { id: npcId, voice: plugin.settings.defaultVoice, style: "", persona: "", tts: {} };
+      const voiceRow = editorContainer.createEl("div", { attr: { style: "margin-bottom:6px; display:flex; gap:8px; align-items:center;" } });
+      voiceRow.createEl("label", { text: "Voice:" });
+      const voiceSelect = voiceRow.createEl("select");
+      ["alloy", "verse", "lumen", "echo", "flow"].forEach((v2) => {
+        const opt = document.createElement("option");
+        opt.value = v2;
+        opt.text = v2;
+        if (profile.voice === v2) opt.selected = true;
+        voiceSelect.appendChild(opt);
+      });
+      editorContainer.createEl("div", { attr: { style: "margin-top:6px;" } }).createEl("label", { text: "Style (short):" });
+      const styleField = editorContainer.createEl("textarea");
+      styleField.rows = 2;
+      styleField.value = profile.style || "";
+      editorContainer.createEl("div", { attr: { style: "margin-top:6px;" } }).createEl("label", { text: "Persona (longer):" });
+      const personaField = editorContainer.createEl("textarea");
+      personaField.rows = 4;
+      personaField.value = profile.persona || "";
+      editorContainer.createEl("div", { attr: { style: "margin-top:6px;" } }).createEl("h4", { text: "TTS Settings" });
+      const ttsRow = editorContainer.createEl("div", { attr: { style: "display:flex; gap:8px; align-items:center;" } });
+      ttsRow.createEl("label", { text: "Rate:" });
+      const rateInput = ttsRow.createEl("input");
+      rateInput.type = "text";
+      rateInput.value = profile.tts?.rate || "1.0";
+      rateInput.style.width = "80px";
+      ttsRow.createEl("label", { text: "Pitch:" });
+      const pitchInput = ttsRow.createEl("input");
+      pitchInput.type = "text";
+      pitchInput.value = profile.tts?.pitch || "0%";
+      pitchInput.style.width = "80px";
+      ttsRow.createEl("label", { text: "Pre(ms):" });
+      const preInput = ttsRow.createEl("input");
+      preInput.type = "number";
+      preInput.value = (profile.tts?.prePauseMs || 0).toString();
+      preInput.style.width = "80px";
+      ttsRow.createEl("label", { text: "Post(ms):" });
+      const postInput = ttsRow.createEl("input");
+      postInput.type = "number";
+      postInput.value = (profile.tts?.postPauseMs || 0).toString();
+      postInput.style.width = "80px";
+      editorContainer.createEl("div", { attr: { style: "margin-top:6px;" } }).createEl("label", { text: "Phonemes / notes:" });
+      const phonemeField = editorContainer.createEl("textarea");
+      phonemeField.rows = 2;
+      phonemeField.value = profile.tts?.phonemes || "";
+      const btns = editorContainer.createEl("div", { attr: { style: "display:flex; gap:8px; margin-top:8px;" } });
+      const saveBtn = btns.createEl("button", { text: "Save" });
+      const previewBtn = btns.createEl("button", { text: "Preview" });
+      saveBtn.addEventListener("click", async () => {
+        const newProfile = { voice: voiceSelect.value, style: styleField.value, persona: personaField.value };
+        await plugin.setNpcProfile(npcId, newProfile);
+        plugin.npcRegistry[npcId].tts = { rate: rateInput.value, pitch: pitchInput.value, prePauseMs: parseInt(preInput.value) || 0, postPauseMs: parseInt(postInput.value) || 0, phonemes: phonemeField.value };
+        await plugin.saveNpcRegistry();
+        new import_obsidian.Notice("NPC profile saved");
+      });
+      previewBtn.addEventListener("click", async () => {
+        const temp = { id: npcId, voice: voiceSelect.value, style: styleField.value, persona: personaField.value, tts: { rate: rateInput.value, pitch: pitchInput.value, prePauseMs: parseInt(preInput.value) || 0, postPauseMs: parseInt(postInput.value) || 0, phonemes: phonemeField.value } };
+        const original = plugin.npcRegistry[npcId];
+        plugin.npcRegistry[npcId] = temp;
+        await plugin.playTTS(npcId, "Vault Forge, can be EXPRESSIVE!");
+        setTimeout(() => {
+          if (original) plugin.npcRegistry[npcId] = original;
+          else delete plugin.npcRegistry[npcId];
+        }, 2e3);
+      });
+    }
   }
 };
 /*! Bundled license information:

@@ -27073,6 +27073,16 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
       "dist"
     );
     app.use("/", import_express.default.static(distPath));
+    app.get("/api/items", async (_req, res) => {
+      try {
+        const vf = this.app.vaultforge5etools;
+        const items = vf ? vf.getTable("items") : [];
+        res.json(items);
+      } catch (err) {
+        console.error("[VaultForge-Player] Error fetching items:", err);
+        res.status(500).json({ error: "Failed to load items" });
+      }
+    });
     app.get("/api/players", async (_req, res) => {
       try {
         const folderPath = this.settings.playersPath || "Players";

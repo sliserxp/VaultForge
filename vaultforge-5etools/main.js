@@ -2126,6 +2126,7 @@ var require_sql_wasm = __commonJS({
 // main.ts
 var main_exports = {};
 __export(main_exports, {
+  appendToDatabase: () => appendToDatabase,
   buildDatabase: () => buildDatabase,
   default: () => VaultForge5eTools,
   indexTable: () => indexTable,
@@ -2285,7 +2286,12 @@ function normalizeAny(raw) {
     weight: raw.weight ?? null,
     attunement: raw.reqAttune ?? null,
     level: raw.level ?? null,
-    school: raw.school ?? null
+    school: raw.school ?? null,
+    // Tags for categorization/search (prefer explicit tags, fall back to type/subtype)
+    tags: (() => {
+      const t = raw.tags ?? raw.type ?? raw.subtype ?? [];
+      return Array.isArray(t) ? t : [t];
+    })()
   };
   normalized.strength = scoreEntry(normalized);
   if (kind === "Item") {
@@ -2304,9 +2310,9 @@ async function initDb() {
   const SQL = await (0, import_sql.default)({ wasmBinary: sql_wasm_default });
   return SQL;
 }
-async function loadDatabase(dbPath) {
+async function loadDatabase(dbPath, force = false) {
   console.log(`[VaultForge-5eTools] Attempting to load DB: ${dbPath}`);
-  if (db) return db;
+  if (db && !force) return db;
   const SQL = await initDb();
   const fileBuffer = fs.readFileSync(dbPath);
   db = new SQL.Database(fileBuffer);
@@ -2354,6 +2360,25 @@ function indexTable(db2, table) {
   }
   stmt.free();
   return rows;
+}
+async function appendToDatabase(table, obj, dbPath) {
+  const SQL = await initDb();
+  let localDb;
+  if (fs.existsSync(dbPath)) {
+    const buf = fs.readFileSync(dbPath);
+    localDb = new SQL.Database(buf);
+  } else {
+    localDb = new SQL.Database();
+  }
+  try {
+    localDb.run(`CREATE TABLE IF NOT EXISTS ${table} (data TEXT)`);
+    localDb.run(`INSERT INTO ${table} VALUES (?)`, [JSON.stringify(obj)]);
+    const out = Buffer.from(localDb.export());
+    fs.writeFileSync(dbPath, out);
+  } catch (e) {
+    console.error("[VaultForge-5eTools] appendToDatabase failed:", e);
+    throw e;
+  }
 }
 async function rebuildDatabase(plugin) {
   const dbPath = pluginPath(plugin, plugin.settings.dbPath);
@@ -2508,6 +2533,21 @@ var VaultForge5eTools = class extends import_obsidian.Plugin {
       console.error("Failed to init DB:", err);
       new import_obsidian.Notice("VaultForge-5eTools failed to init DB.");
     }
+    this.app.vaultforge5etools = {
+      getTable: (table) => db ? indexTable(db, table) : [],
+      searchName: (q, type = "all") => search(q, type),
+      appendToDatabase: async (table, obj) => {
+        try {
+          const p = pluginPath(this, this.settings.dbPath);
+          await appendToDatabase(table, obj, p);
+          db = await loadDatabase(p, true);
+          return { success: true };
+        } catch (e) {
+          console.error("[VaultForge-5eTools] appendToDatabase failed via API:", e);
+          return { success: false, error: String(e) };
+        }
+      }
+    };
     this.addCommand({
       id: "5etools-search",
       name: "Search 5eTools",
@@ -2547,6 +2587,7 @@ var VaultForge5eToolsSettingTab = class extends import_obsidian.PluginSettingTab
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  appendToDatabase,
   buildDatabase,
   indexTable,
   loadDatabase,
