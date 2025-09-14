@@ -9,9 +9,9 @@ VaultForge-Chat : branch to call on askvault to chat with open ai directly with 
 
 VaultForge-Talk : NPC based chat where you can talk to the npc, working on openai, and openai tts with ssml. 
 
-VaultForge-5eTools : 5etools repo used in a way that is databased with sql and can be called on an put into notes (need to add yaml formatting later)
+VaultForge-5eTools : 5etools repo integration. (that is databased with sql and can be called on an put into notes need to add yaml formatting later) threw sql out the window. not sure what im going to implement next. 
 
-VaultForge-Player : Player side character sheet, invintory, spells, shops, maps, and handouts. using server through obsidian and qr code for access. updates to obsisian file yaml.
+VaultForge-Player : Player side character sheet, invintory, spells, shops, maps, and handouts. using server through obsidian and qr code for access. updates to obsisian file yaml. 5etools might end up housed here not sure yet. 
 
 VaultForge-generate : [placeholder] tool to find and recommend context holes in game to fill and autogen missing context/links/tags on already existing lore. generate from template using vault context.
 
