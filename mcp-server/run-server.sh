@@ -1,5 +1,5 @@
-#!/bin/sh
-set -e
+#!/usr/bin/env sh
+set -eu
 cd "$(dirname "$0")"
 
 # prefer local venv, fallback to workspace venv
