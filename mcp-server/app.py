@@ -56,10 +56,10 @@ def get_file(path: str = Query(...), start: int = 0, length: Optional[int] = Non
         return JSONResponse({"path": path, "start": start, "length": len(data), "data_b64": base64.b64encode(data).decode("ascii")})
 
 @app.get("/search")
-def search(q: str = Query(..., description="search term"), prefix: Optional[str] = Query(None, description="filter by path prefix"), limit: int = 50):
+def search(q: str = Query(..., description="search term"), prefix: Optional[str] = Query(None, description="filter by path prefix"), limit: int = 50, content: bool = Query(False, description="also search file contents")):
     """
-    Filename/path search (case-insensitive).
-    Returns files whose relative path contains the query string.
+    Filename/path and optional content search (case-insensitive).
+    If content=True, scan text files for occurrences and return snippets with line numbers.
     """
     ql = q.lower()
     results = []
@@ -68,8 +68,32 @@ def search(q: str = Query(..., description="search term"), prefix: Optional[str]
             rel = str(p.relative_to(ROOT))
             if prefix and not rel.startswith(prefix):
                 continue
+            matched = False
+            entry = {"path": rel, "matches": []}
+            # path match
             if ql in rel.lower():
-                results.append({"path": rel, "matched_in": "path"})
+                entry["matches"].append({"matched_in": "path"})
+                matched = True
+            if content:
+                try:
+                    text = p.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    text = None
+                if text:
+                    lines = text.splitlines()
+                    occ = 0
+                    for i, line in enumerate(lines):
+                        if ql in line.lower():
+                            start = max(0, i - 2)
+                            end = min(len(lines), i + 3)
+                            snippet = "\n".join(lines[start:end])
+                            entry["matches"].append({"matched_in": "content", "line": i + 1, "snippet": snippet})
+                            occ += 1
+                            matched = True
+                            if occ >= 3:
+                                break
+            if matched:
+                results.append(entry)
             if len(results) >= limit:
                 break
     return {"query": q, "count": len(results), "results": results}
