@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "pip: install MCP requirements",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/pip install -r mcp-server/requirements.txt",
+      "problemMatcher": []
+    }
+  ]
+}
