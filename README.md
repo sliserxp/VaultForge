@@ -1,4 +1,6 @@
 *disclaimer* i have no idea what im doing.
+
+Note: mcp-server will be added to serve repo files as on-demand context to a local LLM (avoids uploading the whole repo). See mcp-server/README.md for setup.
 (you'll need your own openai api keys)
 
 however welcome to vault forge project that im making to use obsidian for my main d&d platform
