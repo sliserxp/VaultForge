@@ -54,3 +54,22 @@ def get_file(path: str = Query(...), start: int = 0, length: Optional[int] = Non
         import base64
 
         return JSONResponse({"path": path, "start": start, "length": len(data), "data_b64": base64.b64encode(data).decode("ascii")})
+
+@app.get("/search")
+def search(q: str = Query(..., description="search term"), prefix: Optional[str] = Query(None, description="filter by path prefix"), limit: int = 50):
+    """
+    Filename/path search (case-insensitive).
+    Returns files whose relative path contains the query string.
+    """
+    ql = q.lower()
+    results = []
+    for p in ROOT.rglob("*"):
+        if p.is_file():
+            rel = str(p.relative_to(ROOT))
+            if prefix and not rel.startswith(prefix):
+                continue
+            if ql in rel.lower():
+                results.append({"path": rel, "matched_in": "path"})
+            if len(results) >= limit:
+                break
+    return {"query": q, "count": len(results), "results": results}
