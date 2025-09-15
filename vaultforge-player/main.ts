@@ -169,14 +169,29 @@ export default class VaultForgePlayer extends Plugin {
         }
 
         const content = await this.app.vault.read(file);
-        const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
-        if (!yamlMatch) return res.json({});
+      const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (!yamlMatch) return res.json({});
 
-        const data = parseYaml(yamlMatch[1]);
-        res.json(data);
+      // Heuristic normalization to reduce common frontmatter formatting errors:
+      // - convert tabs to two spaces
+      // - add a space after ':' when missing in simple scalar cases (e.g., xp:100 => xp: 100)
+      const rawYamlOriginal = yamlMatch[1];
+      const rawYaml = rawYamlOriginal
+        .replace(/\t/g, '  ')
+        .replace(/:([^\s\n\-\[\{])/g, ': $1');
+
+      try {
+        const data = parseYaml(rawYaml);
+        return res.json(data);
+      } catch (e) {
+        console.error("[VaultForge-Player] Failed to parse YAML frontmatter for", req.params.name, e);
+        // Return empty sheet to avoid 500 and allow frontend to handle gracefully
+        return res.json({});
+      }
       } catch (err) {
         console.error("[VaultForge-Player] Error reading player:", err);
-        res.status(500).json({ error: "Failed to load player" });
+        // Return empty sheet instead of 500 so frontend can handle missing/invalid files
+        return res.json({});
       }
     });
 
@@ -212,6 +227,72 @@ export default class VaultForgePlayer extends Plugin {
         } catch (err) {
           this.updating = false;
           console.error("[VaultForge-Player] Error saving player:", err);
+          res.status(500).json({ error: "Failed to save player" });
+        }
+      }
+    );
+
+    // VaultForge plugin proxy endpoints
+    app.get("/api/vaultforge/search", async (req: Request, res: Response) => {
+      try {
+        const vf = (this.app as any).vaultforge5etools;
+        if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
+        const q = String(req.query.q || "");
+        const type = String(req.query.type || "all");
+        const results = await vf.searchName(q, type);
+        res.json(results);
+      } catch (e) {
+        console.error("[VaultForge-Player] vaultforge search error", e);
+        res.status(500).json({ error: "Search failed" });
+      }
+    });
+
+    app.get("/api/vaultforge/export", async (req: Request, res: Response) => {
+      try {
+        const vf = (this.app as any).vaultforge5etools;
+        if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
+        const uid = String(req.query.uid || "");
+        const payload = await vf.exportForSheet(uid);
+        if (!payload) return res.status(404).json({ error: "Not found" });
+        res.json(payload);
+      } catch (e) {
+        console.error("[VaultForge-Player] vaultforge export error", e);
+        res.status(500).json({ error: "Export failed" });
+      }
+    });
+
+    // Support PUT updates (compat with frontend using PUT)
+    app.put(
+      "/api/player/:name",
+      express.json(),
+      async (req: Request, res: Response) => {
+        try {
+          const filePath = `${this.settings.playersPath}/${req.params.name}.md`;
+          const file = this.app.vault.getAbstractFileByPath(filePath);
+
+          if (!(file instanceof TFile)) {
+            return res.status(404).json({ error: "Player not found" });
+          }
+
+          const content = await this.app.vault.read(file);
+          const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+          const current = yamlMatch ? parseYaml(yamlMatch[1]) || {} : {};
+          const cleanedUpdates = sanitizeData(req.body);
+          deepMerge(current, cleanedUpdates);
+
+          const newYaml = "---\n" + stringifyYaml(current) + "---";
+          const newContent = yamlMatch
+            ? content.replace(/^---\n([\s\S]*?)\n---/, newYaml)
+            : newYaml + "\n" + content;
+
+          this.updating = true;
+          await this.app.vault.modify(file, newContent);
+          this.updating = false;
+
+          res.json({ success: true, data: current });
+        } catch (err) {
+          this.updating = false;
+          console.error("[VaultForge-Player] Error saving player (PUT):", err);
           res.status(500).json({ error: "Failed to save player" });
         }
       }

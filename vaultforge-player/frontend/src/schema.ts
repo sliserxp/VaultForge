@@ -5,7 +5,8 @@ export const characterSchema = {
     label: "Character",
     fields: {
       name: { type: "string", label: "Character Name" },
-      class: { type: "string", label: "Class & Level" },
+      class: { type: "string", label: "Class" },
+      subclass: { type: "string", label: "Subclass" },
       race: { type: "string", label: "Race" },
       background: { type: "string", label: "Background" },
       alignment: { type: "string", label: "Alignment" },
@@ -22,7 +23,8 @@ export const characterSchema = {
     fields: {
       hp_max: { type: "number", label: "Max HP" },
       hp_current: { type: "number", label: "Current HP" },
-      hp_temp: { type: "number", label: "Temporary HP" }
+      hp_temp: { type: "number", label: "Temporary HP" },
+      hit_die: { type: "string", label: "Class Hit Die" }
     }
   },
 
@@ -54,24 +56,30 @@ export const characterSchema = {
     }
   },
 
-  // Saving Throws & Skills
-  proficiencies: {
+  //Skills
+  skills: {
     type: "group",
-    label: "Proficiencies",
+    label: "Skills",
     fields: {
-      saving_throws: {
-        type: "map",
-        label: "Saving Throws",
-        options: ["none", "proficient"]
-      },
-      skills: {
-        type: "map",
-        label: "Skills",
-        options: ["none", "proficient", "expertise"]
-      }
-    }
+        Athletics: { type: "select", label: "Athletics", options: ["none","proficient","expertise"] },
+        Acrobatics: { type: "select", label: "Acrobatics", options: ["none","proficient","expertise"] },
+        Slight_of_Hand: { type: "select", label: "Slight of Hand", options: ["none","proficient","expertise"] },
+        Arcana: { type: "select", label: "Arcana", options: ["none","proficient","expertise"] }, 
+        History: { type: "select", label: "History", options: ["none","proficient","expertise"] },
+        Investigation: { type: "select", label: "Investigation", options: ["none","proficient","expertise"] },
+        Nature: { type: "select", label: "Nature", options: ["none","proficient","expertise"] },
+        Religion: { type: "select", label: "Religion", options: ["none","proficient","expertise"] },
+        Animal_Handling: { type: "select", label: "Animal Handling", options: ["none","proficient","expertise"] },
+        Insight: { type: "select", label: "Insight", options: ["none","proficient","expertise"] },
+        Medicine: { type: "select", label: "Medicine", options: ["none","proficient","expertise"] },
+        Perception: { type: "select", label: "Perception", options: ["none","proficient","expertise"] },
+        Survival: { type: "select", label: "Survival", options: ["none","proficient","expertise"] },
+        Deception: { type: "select", label: "Deception", options: ["none","proficient","expertise"] },
+        Intimidation: { type: "select", label: "Intimidation", options: ["none","proficient","expertise"] },
+        Performance: { type: "select", label: "Performance", options: ["none","proficient","expertise"] },
+        Persuasion: { type: "select", label: "Persuasion", options: ["none","proficient","expertise"] }     
+     }
   },
-
   // Attacks
   attacks: {
     type: "list",
@@ -90,7 +98,11 @@ export const characterSchema = {
     label: "Inventory",
     itemFields: {
       name: { type: "string", label: "Item" },
-      qty: { type: "number", label: "Qty" }
+      qty: { type: "number", label: "Qty" },
+      cost: { type: "number", label: "Cost (gp)", default: 0 },
+      rarity: { type: "string", label: "Rarity" },
+      source: { type: "string", label: "Source" },
+      grantedBy: { type: "string", label: "Granted By" }
     }
   },
 
@@ -99,6 +111,8 @@ export const characterSchema = {
     type: "group",
     label: "Currency",
     fields: {
+      Wrold_Fragments: { type: "number", label: "World Fragments" },
+      Value: { type: "number", label: "Gp Total" },
       platinum: { type: "number", label: "Platinum", default: 0 },
       gold: { type: "number", label: "Gold", default: 0 },
       silver: { type: "number", label: "Silver", default: 0 },
@@ -135,11 +149,32 @@ export const characterSchema = {
     type: "group",
     label: "Traits & Features",
     fields: {
-      race_features: { type: "textarea", label: "Racial Features" },
-      class_features: { type: "textarea", label: "Class Features" },
+      race_features: {
+        type: "list",
+        label: "Racial Features",
+        itemFields: { title: { type: "string" }, text: { type: "textarea" } }
+      },
+      class_features: {
+        type: "list",
+        label: "Class Features",
+        itemFields: { title: { type: "string" }, text: { type: "textarea" } }
+      },
+      subclass_features: {
+        type: "list",
+        label: "Subclass Features",
+        itemFields: { title: { type: "string" }, text: { type: "textarea" } }
+      },
+      background_description: { type: "textarea", label: "BG Description"},
       feats: { type: "textarea", label: "Feats" }
     }
   },
+
+  // Profinciencies
+  Profinciencies: {
+    typle: "list",
+    label: "Proficiencies",
+    itemFields:{ name: { type: "string" } },
+   },
 
   // Character Details
   details: {
@@ -159,6 +194,26 @@ export const characterSchema = {
       allies: { type: "textarea", label: "Allies & Organizations" },
       enemies: { type: "textarea", label: "Enemies" },
       backstory: { type: "textarea", label: "Backstory" }
+    }
+  },
+
+  // External import helper (from VaultForge)
+  externalImport: {
+    type: "group",
+    label: "Imported Entry",
+    fields: {
+      uid: { type: "string", label: "UID" },
+      name: { type: "string", label: "Name" },
+      type: { type: "string", label: "Type" }
+    }
+  },
+
+  undefined: {
+    type: "list",
+    label: "Undefined / Unmapped",
+    itemFields: {
+      key: { type: "string", label: "Key" },
+      example: { type: "string", label: "Example Value" }
     }
   },
 

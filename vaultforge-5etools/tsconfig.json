@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "strict": true,
     "outDir": "./",
-    "types": ["obsidian"],
+    "types": ["obsidian","node"],
     "skipLibCheck": true
   },
   "files": ["main.ts"],

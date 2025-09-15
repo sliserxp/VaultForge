@@ -2,14 +2,15 @@ import React, { useState, useEffect, useMemo } from "react";
 import { characterSchema } from "./schema";
 import { RenderField } from "./RenderField";
 import ShopView from "./ShopView";
+import ImportTab from "./import";
 
 export default function App() {
   const [tab, setTab] = useState("Character");
   const [players, setPlayers] = useState<string[]>([]);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState<string>(() => localStorage.getItem("selectedPlayer") ?? "");
   const [player, setPlayer] = useState<any>(null);
 
-  const tabs = ["Character", "Inventory", "Spells", "Shop", "Talk", "Lore"];
+  const tabs = ["Import", "Character", "Inventory", "Spells", "Shop", "Talk", "Lore"];
 
   // Load players list
   useEffect(() => {
@@ -19,14 +20,16 @@ export default function App() {
   // Load selected player
   useEffect(() => {
     if (selected) {
-      fetch(`/api/player/${selected}`).then(r => r.json()).then(setPlayer);
+      // persist selection for other UI pieces (Import tab, Spells, etc.)
+      localStorage.setItem("selectedPlayer", selected);
+      fetch(`/api/player/${encodeURIComponent(selected)}`).then(r => r.json()).then(setPlayer);
     }
   }, [selected]);
 
   // ---------- Save Logic ----------
   async function updatePlayer(updates: any) {
     if (!selected) return;
-    await fetch(`/api/player/${selected}`, {
+    await fetch(`/api/player/${encodeURIComponent(selected)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
@@ -51,9 +54,9 @@ export default function App() {
   const renderTab = () => {
     switch (tab) {
       case "Character":
-        if (!player) {
-          return (
-            <div>
+        return (
+          <div>
+            <div className="mb-4">
               <h1 className="text-xl font-bold mb-2">Select Character</h1>
               <select
                 className="border p-2"
@@ -66,29 +69,29 @@ export default function App() {
                 ))}
               </select>
             </div>
-          );
-        }
-        return (
-          <div className="space-y-6">
-            {Object.entries(characterSchema).map(([field, schema]) => (
-              <div key={field} className="border rounded p-3 bg-white shadow">
-                <h2 className="text-lg font-bold mb-2">{schema.label || field}</h2>
-                <RenderField
-                  schema={schema}
-                  value={player[field]}
-                  // Local state update first
-                  onChange={(val: any) => {
-                    setPlayer((prev: any) => ({ ...prev, [field]: val }));
-                    debouncedUpdate({ [field]: val });
-                  }}
-                  // Force save on blur (safety net)
-                  onBlur={() => updatePlayer({ [field]: player[field] })}
-                />
+
+            {!player ? null : (
+              <div className="space-y-6">
+                {Object.entries(characterSchema).map(([field, schema]) => (
+                  <div key={field} className="border rounded p-3 bg-white shadow">
+                    <h2 className="text-lg font-bold mb-2">{schema.label || field}</h2>
+                    <RenderField
+                      schema={schema}
+                      value={player[field]}
+                      onChange={(val: any) => {
+                        setPlayer((prev: any) => ({ ...prev, [field]: val }));
+                        debouncedUpdate({ [field]: val });
+                      }}
+                      onBlur={() => updatePlayer({ [field]: player[field] })}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         );
-
+      case "Import":
+        return <ImportTab />;
       case "Inventory": return <div>Inventory Tab Placeholder</div>;
       case "Spells": return <div>Spells Tab Placeholder</div>;
       case "Shop": {

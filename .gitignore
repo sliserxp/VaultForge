@@ -2,7 +2,9 @@
 node_modules/
 dist/
 build/
+data/
 .esbuild/
+lib/
 .vite/
 *.log
 
@@ -13,12 +15,13 @@ build/
 .obsidian/plugins/**/data.json
 .obsidian/plugins/gpt5-plugin
 .obsidian/plugins/VoiceActor
-.obsidian/plugins/vaultforge-5etools/data/** 
-.obsidian/plugins/vaultforge-5etools/oldbackup/**
+.obsidian/plugins/**/data/
+.obsidian/plugins/**/lib/
 
 # Env / secrets
 .env
 .env.*
+*.continueigonre
 *.key
 *.bak
 *.tmp
@@ -27,5 +30,4 @@ build/
 continue/config.json
 
 vaultforge-core/data.json
-sql-wasm.wasm
 vaultforge-5etools/5etools.db

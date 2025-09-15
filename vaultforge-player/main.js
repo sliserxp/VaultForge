@@ -27107,11 +27107,18 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
         const content = await this.app.vault.read(file);
         const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
         if (!yamlMatch) return res.json({});
-        const data = (0, import_obsidian.parseYaml)(yamlMatch[1]);
-        res.json(data);
+        const rawYamlOriginal = yamlMatch[1];
+        const rawYaml = rawYamlOriginal.replace(/\t/g, "  ").replace(/:([^\s\n\-\[\{])/g, ": $1");
+        try {
+          const data = (0, import_obsidian.parseYaml)(rawYaml);
+          return res.json(data);
+        } catch (e) {
+          console.error("[VaultForge-Player] Failed to parse YAML frontmatter for", req.params.name, e);
+          return res.json({});
+        }
       } catch (err) {
         console.error("[VaultForge-Player] Error reading player:", err);
-        res.status(500).json({ error: "Failed to load player" });
+        return res.json({});
       }
     });
     app.post(
@@ -27138,6 +27145,60 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
         } catch (err) {
           this.updating = false;
           console.error("[VaultForge-Player] Error saving player:", err);
+          res.status(500).json({ error: "Failed to save player" });
+        }
+      }
+    );
+    app.get("/api/vaultforge/search", async (req, res) => {
+      try {
+        const vf = this.app.vaultforge5etools;
+        if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
+        const q = String(req.query.q || "");
+        const type = String(req.query.type || "all");
+        const results = await vf.searchName(q, type);
+        res.json(results);
+      } catch (e) {
+        console.error("[VaultForge-Player] vaultforge search error", e);
+        res.status(500).json({ error: "Search failed" });
+      }
+    });
+    app.get("/api/vaultforge/export", async (req, res) => {
+      try {
+        const vf = this.app.vaultforge5etools;
+        if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
+        const uid = String(req.query.uid || "");
+        const payload = await vf.exportForSheet(uid);
+        if (!payload) return res.status(404).json({ error: "Not found" });
+        res.json(payload);
+      } catch (e) {
+        console.error("[VaultForge-Player] vaultforge export error", e);
+        res.status(500).json({ error: "Export failed" });
+      }
+    });
+    app.put(
+      "/api/player/:name",
+      import_express.default.json(),
+      async (req, res) => {
+        try {
+          const filePath = `${this.settings.playersPath}/${req.params.name}.md`;
+          const file = this.app.vault.getAbstractFileByPath(filePath);
+          if (!(file instanceof import_obsidian.TFile)) {
+            return res.status(404).json({ error: "Player not found" });
+          }
+          const content = await this.app.vault.read(file);
+          const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+          const current = yamlMatch ? (0, import_obsidian.parseYaml)(yamlMatch[1]) || {} : {};
+          const cleanedUpdates = sanitizeData(req.body);
+          deepMerge(current, cleanedUpdates);
+          const newYaml = "---\n" + (0, import_obsidian.stringifyYaml)(current) + "---";
+          const newContent = yamlMatch ? content.replace(/^---\n([\s\S]*?)\n---/, newYaml) : newYaml + "\n" + content;
+          this.updating = true;
+          await this.app.vault.modify(file, newContent);
+          this.updating = false;
+          res.json({ success: true, data: current });
+        } catch (err) {
+          this.updating = false;
+          console.error("[VaultForge-Player] Error saving player (PUT):", err);
           res.status(500).json({ error: "Failed to save player" });
         }
       }
