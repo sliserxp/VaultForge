@@ -99,4 +99,31 @@ export const VF_MAPS = {
     bestiary: "bestiary/index.json",
     class: "class/index.json",
   },
+
+  // classExportMap: normalized className -> {
+  //   hd: { number: 1, faces: 10 },
+  //   levels: {
+  //     1: {
+  //       features: [],               // array of feature objects {name, type, source, level, ...}
+  //       spellSlots: {},            // e.g. {1: 2, 2: 0, ...}
+  //       spellsKnown: 0,            // number (for spontaneous casters)
+  //       spellcasting: {            // metadata about spellcasting for this level
+  //         type: "full"|"half"|"pact"|"none",
+  //         ability: "int"|"wis"|"cha",
+  //       },
+  //       spells: []                 // explicit spells gained/available at this level
+  //     },
+  //     // ...
+  //   }
+  // }
+  classExportMap: {},
+
+  makeClassExportEntry: (fileOrClass: any, subclasses?: any[]) => {
+    // Delegates full extraction to vaultforge-5etools/vf-class-export.ts
+    // Use require to keep this file plain JS/TS-compatible without extra imports at top
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const helper = require("./vf-class-export");
+    return helper.makeClassExportMap(fileOrClass, subclasses);
+  },
+
 };

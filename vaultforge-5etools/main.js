@@ -1023,6 +1023,23 @@ var VaultForge5eTools = class extends import_obsidian.Plugin {
           value: norm.value ?? null,
           raw: norm.raw ?? null
         };
+      },
+
+      // Build normalized class export (accepts uid or raw file/class object)
+      makeClassExportEntry: async function(input) {
+        let fileOrClass = input;
+        // if input is a UID string, try to resolve to raw object via getByUid
+        if (typeof input === "string") {
+          const entry = await this.getByUid(input);
+          if (entry && entry.raw) fileOrClass = entry.raw;
+        }
+        // if we still have a uid-like string, attempt to read file from data path (best-effort)
+        if (typeof fileOrClass === "string" && fileOrClass.includes("|") && fileOrClass.indexOf("/") === -1) {
+          // treat as uid: name|source
+          const entry = await this.getByUid(fileOrClass);
+          if (entry && entry.raw) fileOrClass = entry.raw;
+        }
+        return VF_MAPS.makeClassExportEntry(fileOrClass);
       }
     };
     this.addCommand({

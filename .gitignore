@@ -4,6 +4,10 @@ dist/
 build/
 data/
 .esbuild/
+.continue/
+.vscode/
+.continueigonre
+mcp-server/
 lib/
 .vite/
 *.log
@@ -17,6 +21,9 @@ lib/
 .obsidian/plugins/VoiceActor
 .obsidian/plugins/**/data/
 .obsidian/plugins/**/lib/
+.obsidian/plugins/.vscode/**
+.obsidian/plugins/.continue/**
+.obsidian/plugins/mcp-server/**
 
 # Env / secrets
 .env
