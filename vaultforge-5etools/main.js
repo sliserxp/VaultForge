@@ -5,6 +5,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -26,6 +29,180 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// vf-class-export.ts
+var vf_class_export_exports = {};
+__export(vf_class_export_exports, {
+  makeClassExportMap: () => makeClassExportMap
+});
+function makeClassExportMap(fileOrClass, subclassesArg) {
+  const files = fileOrClass && fileOrClass.class ? fileOrClass : null;
+  const classes = files ? files.class || [] : Array.isArray(fileOrClass) ? fileOrClass : [fileOrClass];
+  const allSubclasses = files ? files.subclass || [] : subclassesArg || [];
+  const normalizeKey = (name, source) => `${(name || "").toLowerCase().replace(/\s+/g, "-")}|${(source || "").toLowerCase()}`;
+  const result = {};
+  const ensureLevel = (levelsObj, lvl) => {
+    const k = String(lvl);
+    if (!levelsObj[k]) levelsObj[k] = { features: [], spellSlots: {}, spellsKnown: 0, spellcasting: null, spells: [] };
+    return levelsObj[k];
+  };
+  for (const cls of classes) {
+    const key = normalizeKey(cls.name, cls.source);
+    const hd = cls.hd && { number: cls.hd.number, faces: cls.hd.faces } || { number: 1, faces: 10 };
+    const baseLevels = {};
+    for (const f of cls.classFeatures || []) {
+      if (typeof f === "string") {
+        const parts = f.split("|");
+        const name = parts[0] || f;
+        const src = parts[2] || cls.source;
+        const lvl = Number(parts[3] || parts[4] || 1);
+        const bucket = ensureLevel(baseLevels, lvl);
+        bucket.features.push({ name, source: src, level: lvl });
+      } else if (f && typeof f === "object") {
+        const raw = f.classFeature || f.classfeature;
+        if (typeof raw === "string") {
+          const parts = raw.split("|");
+          const name = parts[0] || raw;
+          const src = parts[2] || cls.source;
+          const lvl = Number(parts[3] || 1);
+          const bucket = ensureLevel(baseLevels, lvl);
+          bucket.features.push({ name, source: src, level: lvl, gainSubclassFeature: !!f.gainSubclassFeature });
+        } else {
+          const lvl = Number(f.level || 1);
+          const bucket = ensureLevel(baseLevels, lvl);
+          bucket.features.push({ raw: f, level: lvl });
+        }
+      }
+    }
+    for (const cf of cls.classFeature || []) {
+      const lvl = Number(cf.level || 1);
+      const bucket = ensureLevel(baseLevels, lvl);
+      bucket.features.push({ name: cf.name, source: cf.source, level: lvl, entries: cf.entries });
+    }
+    result[key] = { hd, levels: baseLevels, subclasses: {} };
+    const mySubs = allSubclasses.filter((s) => s.className === cls.name || s.className === cls.name && s.classSource === cls.source || s.className === cls.name);
+    for (const sc of mySubs) {
+      const sk = normalizeKey(sc.name || sc.shortName || sc.subclassShortName || "subclass", sc.source);
+      const scHd = sc.hd ? { number: sc.hd.number, faces: sc.hd.faces } : hd;
+      const scLevels = {};
+      const writeSpellcastingToLevel = (lvlIdx, data) => {
+        const bucket = ensureLevel(scLevels, lvlIdx);
+        bucket.spellcasting = Object.assign({}, bucket.spellcasting || {}, data);
+      };
+      if (sc.cantripProgression) {
+        sc.cantripProgression.forEach((c, idx) => {
+          writeSpellcastingToLevel(idx + 1, { cantripsKnown: c });
+        });
+      }
+      if (sc.spellsKnownProgression) {
+        sc.spellsKnownProgression.forEach((c, idx) => {
+          writeSpellcastingToLevel(idx + 1, { spellsKnown: c });
+        });
+      }
+      if (sc.preparedSpellsProgression) {
+        sc.preparedSpellsProgression.forEach((c, idx) => {
+          writeSpellcastingToLevel(idx + 1, { spellsKnown: c, prepared: true });
+        });
+      }
+      if (sc.spellcastingAbility) {
+        writeSpellcastingToLevel(1, { ability: sc.spellcastingAbility, casterProgression: sc.casterProgression || sc.casterProgression });
+      }
+      if (sc.additionalSpells) {
+        for (const add of sc.additionalSpells) {
+          if (add.expanded) {
+            for (const lvlStr of Object.keys(add.expanded)) {
+              const lvl = Number(lvlStr);
+              const bucket = ensureLevel(scLevels, lvl);
+              bucket.spells = bucket.spells || [];
+              bucket.spells.push({ expanded: add.expanded[lvlStr] });
+            }
+          }
+          if (add.known) {
+            for (const lvlStr of Object.keys(add.known)) {
+              const lvl = Number(lvlStr);
+              const bucket = ensureLevel(scLevels, lvl);
+              bucket.spells = bucket.spells || [];
+              bucket.spells.push({ known: add.known[lvlStr] });
+            }
+          }
+          if (add.innate) {
+            for (const lvlStr of Object.keys(add.innate)) {
+              const lvl = Number(lvlStr);
+              const bucket = ensureLevel(scLevels, lvl);
+              bucket.spells = bucket.spells || [];
+              bucket.spells.push({ innate: add.innate[lvlStr] });
+            }
+          }
+        }
+      }
+      for (const g of sc.subclassTableGroups || []) {
+        if (g.rowsSpellProgression) {
+          g.rowsSpellProgression.forEach((row, rowIdx) => {
+            const lvl = rowIdx + 1;
+            const bucket = ensureLevel(scLevels, lvl);
+            bucket.spellSlots = bucket.spellSlots || {};
+            row.forEach((count, idx) => {
+              const spellLevel = idx + 1;
+              const n = Number(count || 0);
+              if (n > 0) bucket.spellSlots[String(spellLevel)] = n;
+            });
+          });
+        }
+        if (g.rows && g.colLabels && Array.isArray(g.colLabels)) {
+          const mappings = {};
+          g.colLabels.forEach((label, colIdx) => {
+            const lower = String(label).toLowerCase();
+            if (lower.includes("cantrips")) mappings[colIdx] = "cantripsKnown";
+            else if (lower.includes("spells known") || lower.includes("spellsknown") || lower.includes("spells prepared") || lower.includes("spells prepared")) mappings[colIdx] = "spellsKnown";
+          });
+          if (Object.keys(mappings).length) {
+            g.rows.forEach((row, rowIdx) => {
+              const lvl = rowIdx + 1;
+              const bucket = ensureLevel(scLevels, lvl);
+              Object.entries(mappings).forEach(([colStr, prop]) => {
+                const col = Number(colStr);
+                const val = row[col];
+                if (prop === "cantripsKnown") bucket.spellcasting = Object.assign({}, bucket.spellcasting || {}, { cantripsKnown: val });
+                if (prop === "spellsKnown") bucket.spellcasting = Object.assign({}, bucket.spellcasting || {}, { spellsKnown: val });
+              });
+            });
+          }
+        }
+      }
+      if (sc.casterProgression && !Object.keys(scLevels).length) {
+        writeSpellcastingToLevel(1, { casterProgression: sc.casterProgression });
+      }
+      result[key].subclasses[sk] = { hd: scHd, levels: scLevels };
+      for (const lvlStr of Object.keys(scLevels)) {
+        const lvl = Number(lvlStr);
+        const baseBucket = ensureLevel(result[key].levels, lvl);
+        const scBucket = scLevels[lvlStr];
+        baseBucket.spellSlots = Object.assign({}, baseBucket.spellSlots || {}, scBucket.spellSlots || {});
+        if (scBucket.spells && scBucket.spells.length) {
+          baseBucket.spells = (baseBucket.spells || []).concat(scBucket.spells);
+        }
+        baseBucket.subclassSpellcasting = baseBucket.subclassSpellcasting || {};
+        baseBucket.subclassSpellcasting[sk] = Object.assign({}, baseBucket.subclassSpellcasting[sk] || {}, scBucket.spellcasting || {});
+        if (scBucket.spellcasting) {
+          baseBucket.spellcasting = baseBucket.spellcasting || {};
+          if (scBucket.spellcasting.ability) baseBucket.spellcasting.ability = baseBucket.spellcasting.ability || scBucket.spellcasting.ability;
+          if (scBucket.spellcasting.casterProgression) baseBucket.spellcasting.casterProgression = baseBucket.spellcasting.casterProgression || scBucket.spellcasting.casterProgression;
+          if (scBucket.spellcasting.cantripsKnown != null) baseBucket.spellcasting.cantripsKnown = baseBucket.spellcasting.cantripsKnown != null ? baseBucket.spellcasting.cantripsKnown : scBucket.spellcasting.cantripsKnown;
+          if (scBucket.spellcasting.spellsKnown != null) baseBucket.spellcasting.spellsKnown = baseBucket.spellcasting.spellsKnown != null ? baseBucket.spellcasting.spellsKnown : scBucket.spellcasting.spellsKnown;
+        }
+        if (scBucket.spellsKnown) {
+          baseBucket.spellsKnown = baseBucket.spellsKnown || scBucket.spellsKnown;
+        }
+      }
+    }
+  }
+  return result;
+}
+var init_vf_class_export = __esm({
+  "vf-class-export.ts"() {
+    "use strict";
+  }
+});
 
 // main.ts
 var main_exports = {};
@@ -430,6 +607,27 @@ var VF_MAPS = {
     spells: "spells/index.json",
     bestiary: "bestiary/index.json",
     class: "class/index.json"
+  },
+  // classExportMap: normalized className -> {
+  //   hd: { number: 1, faces: 10 },
+  //   levels: {
+  //     1: {
+  //       features: [],               // array of feature objects {name, type, source, level, ...}
+  //       spellSlots: {},            // e.g. {1: 2, 2: 0, ...}
+  //       spellsKnown: 0,            // number (for spontaneous casters)
+  //       spellcasting: {            // metadata about spellcasting for this level
+  //         type: "full"|"half"|"pact"|"none",
+  //         ability: "int"|"wis"|"cha",
+  //       },
+  //       spells: []                 // explicit spells gained/available at this level
+  //     },
+  //     // ...
+  //   }
+  // }
+  classExportMap: {},
+  makeClassExportEntry: (fileOrClass, subclasses) => {
+    const helper = (init_vf_class_export(), __toCommonJS(vf_class_export_exports));
+    return helper.makeClassExportMap(fileOrClass, subclasses);
   }
 };
 
@@ -1023,23 +1221,6 @@ var VaultForge5eTools = class extends import_obsidian.Plugin {
           value: norm.value ?? null,
           raw: norm.raw ?? null
         };
-      },
-
-      // Build normalized class export (accepts uid or raw file/class object)
-      makeClassExportEntry: async function(input) {
-        let fileOrClass = input;
-        // if input is a UID string, try to resolve to raw object via getByUid
-        if (typeof input === "string") {
-          const entry = await this.getByUid(input);
-          if (entry && entry.raw) fileOrClass = entry.raw;
-        }
-        // if we still have a uid-like string, attempt to read file from data path (best-effort)
-        if (typeof fileOrClass === "string" && fileOrClass.includes("|") && fileOrClass.indexOf("/") === -1) {
-          // treat as uid: name|source
-          const entry = await this.getByUid(fileOrClass);
-          if (entry && entry.raw) fileOrClass = entry.raw;
-        }
-        return VF_MAPS.makeClassExportEntry(fileOrClass);
       }
     };
     this.addCommand({
