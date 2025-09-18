@@ -142,6 +142,10 @@ export default class VaultForgeTalk extends Plugin {
   }
 
   async playTTS(npcName: string, text: string) {
+  if (!this.client) {
+    new Notice("VaultForge-Talk: TTS unavailable (no API key).");
+    return;
+  }
   try {
     const profile = this.getNpcProfile(npcName);
     const voice = profile?.voice || this.settings.defaultVoice || "alloy";
@@ -171,7 +175,12 @@ export default class VaultForgeTalk extends Plugin {
     audio.play();
   } catch (err) {
     console.error(err);
-    new Notice("TTS failed.");
+    const msg = String((err as any)?.message || "");
+    if ((err as any)?.status === 401 || /Incorrect API key/i.test(msg)) {
+      new Notice("VaultForge-Talk: Invalid OpenAI API key (401). Update key in Core or Talk settings.");
+    } else {
+      new Notice("TTS failed.");
+    }
   }
 }
 
@@ -193,15 +202,26 @@ export default class VaultForgeTalk extends Plugin {
 
     const systemPrompt = `You are ${npcName}. Stay in character at all times.\n${personaBlock}${styleBlock}Here is what you know about yourself and the world:\n${context}`;
 
-    const completion = await this.client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: playerLine },
-      ],
-    });
+    let npcReply = "";
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: playerLine },
+    ];
+    const corePlugin = (this.app as any).plugins.getPlugin("vaultforge-core");
+    const api = corePlugin?.getAPI ? corePlugin.getAPI() : null;
 
-    const npcReply = completion.choices[0].message.content ?? "";
+    if (api && typeof api.chat === "function") {
+      npcReply = await api.chat(messages, "gpt-4o-mini");
+    } else if (this.client) {
+      const completion = await this.client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+      });
+      npcReply = completion.choices[0].message.content ?? "";
+    } else {
+      new Notice("VaultForge-Talk: No API available. Set API key in Core or Talk settings.");
+      return "…";
+    }
 
     await this.saveTranscript(npcName, playerLine, npcReply);
 
@@ -315,7 +335,7 @@ class NPCEditModal extends Modal {
     const voiceSetting = contentEl.createEl('div', { attr: { style: 'margin-bottom:8px;' } });
     voiceSetting.createEl('label', { text: 'Voice:' });
     const voiceDropdown = voiceSetting.createEl('select');
-    ['alloy','verse','lumen','echo','flow'].forEach(v => {
+    ['alloy','echo','fable','onyx','nova','shimmer','coral','verse','ballad','ash','sage','marin','cedar'].forEach(v => {
       const opt = document.createElement('option'); opt.value = v; opt.text = v; if (profile.voice === v) opt.selected = true; voiceDropdown.appendChild(opt);
     });
 
@@ -421,10 +441,18 @@ class VaultForgeTalkSettingTab extends PluginSettingTab {
         dropdown
           .addOptions({
             alloy: "Alloy",
-            verse: "Verse",
-            lumen: "Lumen",
             echo: "Echo",
-            flow: "Flow",
+            fable: "Fable",
+            onyx: "Onyx",
+            nova: "Nova",
+            shimmer: "Shimmer",
+            coral: "Coral",
+            verse: "Verse",
+            ballad: "Ballad",
+            ash: "Ash",
+            sage: "Sage",
+            marin: "Marin",
+            cedar: "Cedar",
           })
           .setValue(this.plugin.settings.defaultVoice)
           .onChange(async (value) => {
@@ -500,7 +528,7 @@ class VaultForgeTalkSettingTab extends PluginSettingTab {
       const voiceRow = editorContainer.createEl('div', { attr: { style: 'margin-bottom:6px; display:flex; gap:8px; align-items:center;' } });
       voiceRow.createEl('label', { text: 'Voice:' });
       const voiceSelect = voiceRow.createEl('select');
-      ['alloy','verse','lumen','echo','flow'].forEach(v => { const opt = document.createElement('option'); opt.value = v; opt.text = v; if (profile.voice === v) opt.selected = true; voiceSelect.appendChild(opt); });
+      ['alloy','echo','fable','onyx','nova','shimmer','coral','verse','ballad','ash','sage','marin','cedar'].forEach(v => { const opt = document.createElement('option'); opt.value = v; opt.text = v; if (profile.voice === v) opt.selected = true; voiceSelect.appendChild(opt); });
 
       // Style
       editorContainer.createEl('div', { attr: { style: 'margin-top:6px;' } }).createEl('label', { text: 'Style (short):' });

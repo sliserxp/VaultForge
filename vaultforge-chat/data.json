@@ -1,6 +1,6 @@
 {
   "chatFolder": "Chats",
-  "autoRespondOnSave": true,
+  "autoRespondOnSave": false,
   "respondOnEnter": true,
   "maxContextLines": 25,
   "useVaultContext": true,

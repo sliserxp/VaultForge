@@ -2,5 +2,33 @@
   "apiKey": "",
   "defaultVoice": "alloy",
   "autoplay": true,
-  "transcriptMode": "transcript"
+  "transcriptMode": "transcript",
+  "npcs": {
+    "Elandra Voss": {
+      "id": "Elandra Voss",
+      "voice": "alloy",
+      "style": "Womanly, but gruff. With honor",
+      "persona": "",
+      "tts": {
+        "rate": "1.0",
+        "pitch": "2%",
+        "prePauseMs": 0,
+        "postPauseMs": 0,
+        "phonemes": ""
+      }
+    },
+    "Eveline Rivenholt": {
+      "id": "Eveline Rivenholt",
+      "voice": "marin",
+      "style": "\"anime, Youthful, curious, gentle\"",
+      "persona": "\"A bright teenage scholar; earnest and optimistic.\"",
+      "tts": {
+        "rate": "1.15",
+        "pitch": "18",
+        "prePauseMs": 0,
+        "postPauseMs": 60,
+        "phonemes": "“Cheerful anime heroine; expressive ‘eh?’, ‘hm!’; excited but sincere”"
+      }
+    }
+  }
 }

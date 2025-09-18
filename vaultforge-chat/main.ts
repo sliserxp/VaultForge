@@ -41,6 +41,7 @@ const DEFAULT_SETTINGS: VaultForgeChatSettings = {
 
 /* ======================= Main Plugin Class ======================= */
 export default class VaultForgeChatPlugin extends Plugin {
+  statusEl: HTMLElement | null = null;
   core: VaultForgeCoreAPI | null = null;
   settings!: VaultForgeChatSettings;
 
@@ -60,7 +61,7 @@ export default class VaultForgeChatPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("modify", async (file) => {
         if (file instanceof TFile && this.settings.autoRespondOnSave) {
-          await this.handleNoteUpdate(file);
+          await this.handleNoteUpdate(file, "modify");
         }
       })
     );
@@ -74,7 +75,7 @@ export default class VaultForgeChatPlugin extends Plugin {
       ) {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view && view.file && view.file.path.startsWith(this.settings.chatFolder)) {
-          await this.handleNoteUpdate(view.file);
+          await this.handleNoteUpdate(view.file, "enter");
         }
       }
     });
@@ -89,14 +90,20 @@ export default class VaultForgeChatPlugin extends Plugin {
     /* ---------- Settings ---------- */
     this.addSettingTab(new GPTChatSettingTab(this.app, this));
     console.log("✅ VaultForge-Chat loaded and linked to GPT-Core");
+    this.statusEl = this.addStatusBarItem();
+    this.statusEl.setText("VF-Chat: idle");
   }
 
   onunload() {
     console.log("Unloading VaultForge-Chat...");
   }
 
+  private setStatus(msg: string) {
+    try { this.statusEl?.setText(msg); } catch (_) {}
+  }
+
   /* ---------- Core Methods ---------- */
-  async handleNoteUpdate(file: TFile) {
+  async handleNoteUpdate(file: TFile, source: "modify" | "enter" = "modify") {
     if (!file.path.startsWith(this.settings.chatFolder)) return;
     if (!file.path.endsWith(".md")) return;
 
@@ -109,12 +116,20 @@ export default class VaultForgeChatPlugin extends Plugin {
 
     let lastLine = lines[lines.length - 1];
 
-    // Auto-format user input if plain text
+    // Auto-format user input if plain text — but skip if last speaker was GPT (avoid mislabeling multi-line replies)
+    let lastMarker = "";
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const l = lines[i];
+      if (l.startsWith("**You:**")) { lastMarker = "You"; break; }
+      if (l.startsWith("**GPT:**")) { lastMarker = "GPT"; break; }
+    }
     if (!lastLine.startsWith("**You:**") && !lastLine.startsWith("**GPT:**")) {
+      if (lastMarker === "GPT" && source === "modify") return;
       lastLine = `**You:** ${lastLine}`;
       lines[lines.length - 1] = lastLine;
       content = content.trimEnd() + "\n" + lastLine; // append properly
       await this.app.vault.modify(file, content);
+      if (source === "modify") return; // Wait for next modify event to reply (prevents double responses)
     }
 
     // Prevent duplicate GPT replies by checking last "You" line
@@ -136,6 +151,7 @@ export default class VaultForgeChatPlugin extends Plugin {
     let vaultContext = "";
     if (this.settings.useVaultContext && this.core) {
       try {
+        this.setStatus("VF-Chat: looking for context…");
         console.log("=== [VaultForge-Chat] Vault context lookup START ===");
        if (this.settings.vaultMode === "full" && this.core.askVault) {
   vaultContext = await this.core.askVault(userMessage);
@@ -147,13 +163,19 @@ export default class VaultForgeChatPlugin extends Plugin {
           vaultContext.length > 300 ? vaultContext.slice(0, 300) + "..." : vaultContext
         );
         console.log("=== [VaultForge-Chat] Vault context lookup END ===");
+        this.setStatus("VF-Chat: context ready");
       } catch (err) {
+        this.setStatus("VF-Chat: context error");
         console.error("AskVault error:", err);
       }
     }
 
     /* ----- Message Assembly ----- */
+    const cache = this.app.metadataCache.getFileCache(file);
+    const perNotePrompt = (cache?.frontmatter?.vfChatPrompt || cache?.frontmatter?.chatPrompt || "") as string;
+
     const messages: { role: "user" | "assistant" | "system"; content: string }[] = [
+      ...(perNotePrompt ? [{ role: "system" as const, content: perNotePrompt }] : []),
       ...(vaultContext
         ? [{ role: "system" as const, content: `Relevant vault info:\n${vaultContext}` }]
         : []),
@@ -161,10 +183,22 @@ export default class VaultForgeChatPlugin extends Plugin {
     ];
 
     /* ----- GPT Call ----- */
-    const response = await this.core!.chat(messages);
+    new Notice("VaultForge-Chat: sending…");
+    let response = "";
+    try {
+      this.setStatus("VF-Chat: waiting for reply…");
+      new Notice("VaultForge-Chat: waiting for reply…");
+      response = await this.core!.chat(messages);
+    } catch (err: any) {
+      console.error("[VaultForge-Chat] Chat error:", err);
+      new Notice("VaultForge-Chat: chat error. See console.");
+      return;
+    }
 
     /* ----- Append GPT Reply ----- */
     await this.app.vault.modify(file, content + `\n**GPT:** ${response}\n`);
+    this.setStatus("VF-Chat: reply received.");
+    new Notice("VaultForge-Chat: reply received.");
   }
 
   async respondActiveNote() {
@@ -175,7 +209,7 @@ export default class VaultForgeChatPlugin extends Plugin {
     }
     const file = view.file;
     if (file) {
-      await this.handleNoteUpdate(file);
+      await this.handleNoteUpdate(file, "enter");
     }
   }
 

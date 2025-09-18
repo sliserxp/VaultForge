@@ -36,6 +36,7 @@ var DEFAULT_SETTINGS = {
 var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
+    this.statusEl = null;
     this.core = null;
   }
   /* ---------- Lifecycle ---------- */
@@ -50,7 +51,7 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
     this.registerEvent(
       this.app.vault.on("modify", async (file) => {
         if (file instanceof import_obsidian.TFile && this.settings.autoRespondOnSave) {
-          await this.handleNoteUpdate(file);
+          await this.handleNoteUpdate(file, "modify");
         }
       })
     );
@@ -58,7 +59,7 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
       if (this.settings.respondOnEnter && evt.key === "Enter" && evt.shiftKey === false) {
         const view = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
         if (view && view.file && view.file.path.startsWith(this.settings.chatFolder)) {
-          await this.handleNoteUpdate(view.file);
+          await this.handleNoteUpdate(view.file, "enter");
         }
       }
     });
@@ -69,12 +70,20 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
     });
     this.addSettingTab(new GPTChatSettingTab(this.app, this));
     console.log("\u2705 VaultForge-Chat loaded and linked to GPT-Core");
+    this.statusEl = this.addStatusBarItem();
+    this.statusEl.setText("VF-Chat: idle");
   }
   onunload() {
     console.log("Unloading VaultForge-Chat...");
   }
+  setStatus(msg) {
+    try {
+      this.statusEl?.setText(msg);
+    } catch (_) {
+    }
+  }
   /* ---------- Core Methods ---------- */
-  async handleNoteUpdate(file) {
+  async handleNoteUpdate(file, source = "modify") {
     if (!file.path.startsWith(this.settings.chatFolder)) return;
     if (!file.path.endsWith(".md")) return;
     let content = await this.app.vault.read(file);
@@ -82,11 +91,25 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
     lines = lines.slice(-this.settings.maxContextLines).filter((l) => l.trim().length > 0);
     if (lines.length === 0) return;
     let lastLine = lines[lines.length - 1];
+    let lastMarker = "";
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const l = lines[i];
+      if (l.startsWith("**You:**")) {
+        lastMarker = "You";
+        break;
+      }
+      if (l.startsWith("**GPT:**")) {
+        lastMarker = "GPT";
+        break;
+      }
+    }
     if (!lastLine.startsWith("**You:**") && !lastLine.startsWith("**GPT:**")) {
+      if (lastMarker === "GPT" && source === "modify") return;
       lastLine = `**You:** ${lastLine}`;
       lines[lines.length - 1] = lastLine;
       content = content.trimEnd() + "\n" + lastLine;
       await this.app.vault.modify(file, content);
+      if (source === "modify") return;
     }
     if (!lastLine.startsWith("**You:**")) return;
     const userMessage = lastLine.replace("**You:**", "").trim();
@@ -100,6 +123,7 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
     let vaultContext = "";
     if (this.settings.useVaultContext && this.core) {
       try {
+        this.setStatus("VF-Chat: looking for context\u2026");
         console.log("=== [VaultForge-Chat] Vault context lookup START ===");
         if (this.settings.vaultMode === "full" && this.core.askVault) {
           vaultContext = await this.core.askVault(userMessage);
@@ -111,19 +135,36 @@ var VaultForgeChatPlugin = class extends import_obsidian.Plugin {
           vaultContext.length > 300 ? vaultContext.slice(0, 300) + "..." : vaultContext
         );
         console.log("=== [VaultForge-Chat] Vault context lookup END ===");
+        this.setStatus("VF-Chat: context ready");
       } catch (err) {
+        this.setStatus("VF-Chat: context error");
         console.error("AskVault error:", err);
       }
     }
+    const cache = this.app.metadataCache.getFileCache(file);
+    const perNotePrompt = cache?.frontmatter?.vfChatPrompt || cache?.frontmatter?.chatPrompt || "";
     const messages = [
+      ...perNotePrompt ? [{ role: "system", content: perNotePrompt }] : [],
       ...vaultContext ? [{ role: "system", content: `Relevant vault info:
 ${vaultContext}` }] : [],
       ...chatMessages
     ];
-    const response = await this.core.chat(messages);
+    new import_obsidian.Notice("VaultForge-Chat: sending\u2026");
+    let response = "";
+    try {
+      this.setStatus("VF-Chat: waiting for reply\u2026");
+      new import_obsidian.Notice("VaultForge-Chat: waiting for reply\u2026");
+      response = await this.core.chat(messages);
+    } catch (err) {
+      console.error("[VaultForge-Chat] Chat error:", err);
+      new import_obsidian.Notice("VaultForge-Chat: chat error. See console.");
+      return;
+    }
     await this.app.vault.modify(file, content + `
 **GPT:** ${response}
 `);
+    this.setStatus("VF-Chat: reply received.");
+    new import_obsidian.Notice("VaultForge-Chat: reply received.");
   }
   async respondActiveNote() {
     const view = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
@@ -133,7 +174,7 @@ ${vaultContext}` }] : [],
     }
     const file = view.file;
     if (file) {
-      await this.handleNoteUpdate(file);
+      await this.handleNoteUpdate(file, "enter");
     }
   }
   /* ---------- Settings Persistence ---------- */

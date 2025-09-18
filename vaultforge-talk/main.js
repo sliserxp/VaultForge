@@ -13131,6 +13131,10 @@ var VaultForgeTalk = class extends import_obsidian.Plugin {
     this.app.workspace.revealLeaf(leaf);
   }
   async playTTS(npcName, text) {
+    if (!this.client) {
+      new import_obsidian.Notice("VaultForge-Talk: TTS unavailable (no API key).");
+      return;
+    }
     try {
       const profile = this.getNpcProfile(npcName);
       const voice = profile?.voice || this.settings.defaultVoice || "alloy";
@@ -13156,7 +13160,12 @@ var VaultForgeTalk = class extends import_obsidian.Plugin {
       audio.play();
     } catch (err) {
       console.error(err);
-      new import_obsidian.Notice("TTS failed.");
+      const msg = String(err?.message || "");
+      if (err?.status === 401 || /Incorrect API key/i.test(msg)) {
+        new import_obsidian.Notice("VaultForge-Talk: Invalid OpenAI API key (401). Update key in Core or Talk settings.");
+      } else {
+        new import_obsidian.Notice("TTS failed.");
+      }
     }
   }
   async generateNpcResponse(npcName, playerLine) {
@@ -13177,14 +13186,25 @@ var VaultForgeTalk = class extends import_obsidian.Plugin {
       const systemPrompt = `You are ${npcName}. Stay in character at all times.
 ${personaBlock}${styleBlock}Here is what you know about yourself and the world:
 ${context}`;
-      const completion = await this.client.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: playerLine }
-        ]
-      });
-      const npcReply = completion.choices[0].message.content ?? "";
+      let npcReply = "";
+      const messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: playerLine }
+      ];
+      const corePlugin = this.app.plugins.getPlugin("vaultforge-core");
+      const api = corePlugin?.getAPI ? corePlugin.getAPI() : null;
+      if (api && typeof api.chat === "function") {
+        npcReply = await api.chat(messages, "gpt-4o-mini");
+      } else if (this.client) {
+        const completion = await this.client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages
+        });
+        npcReply = completion.choices[0].message.content ?? "";
+      } else {
+        new import_obsidian.Notice("VaultForge-Talk: No API available. Set API key in Core or Talk settings.");
+        return "\u2026";
+      }
       await this.saveTranscript(npcName, playerLine, npcReply);
       if (this.settings.autoplay) {
         await this.playTTS(npcName, npcReply);
@@ -13285,10 +13305,18 @@ var VaultForgeTalkSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Default Voice").setDesc("Fallback voice if NPC YAML is missing one").addDropdown(
       (dropdown) => dropdown.addOptions({
         alloy: "Alloy",
-        verse: "Verse",
-        lumen: "Lumen",
         echo: "Echo",
-        flow: "Flow"
+        fable: "Fable",
+        onyx: "Onyx",
+        nova: "Nova",
+        shimmer: "Shimmer",
+        coral: "Coral",
+        verse: "Verse",
+        ballad: "Ballad",
+        ash: "Ash",
+        sage: "Sage",
+        marin: "Marin",
+        cedar: "Cedar"
       }).setValue(this.plugin.settings.defaultVoice).onChange(async (value) => {
         this.plugin.settings.defaultVoice = value;
         await this.plugin.saveSettings();
@@ -13338,7 +13366,7 @@ var VaultForgeTalkSettingTab = class extends import_obsidian.PluginSettingTab {
       const voiceRow = editorContainer.createEl("div", { attr: { style: "margin-bottom:6px; display:flex; gap:8px; align-items:center;" } });
       voiceRow.createEl("label", { text: "Voice:" });
       const voiceSelect = voiceRow.createEl("select");
-      ["alloy", "verse", "lumen", "echo", "flow"].forEach((v2) => {
+      ["alloy", "echo", "fable", "onyx", "nova", "shimmer", "coral", "verse", "ballad", "ash", "sage", "marin", "cedar"].forEach((v2) => {
         const opt = document.createElement("option");
         opt.value = v2;
         opt.text = v2;
