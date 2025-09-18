@@ -18,6 +18,7 @@ import os from "os";
 import express, { Request, Response } from "express";
 import { join } from "path";
 import type { Server } from "http";
+import fs from "fs";
 
 /* ---------- Shared Utils ---------- */
 type ProficiencyLevel = "none" | "proficient" | "expertise";
@@ -124,6 +125,19 @@ export default class VaultForgePlayer extends Plugin {
       "frontend",
       "dist"
     );
+    // Set a permissive CSP so the frontend can fetch/connect to localhost without being blocked
+    app.use((req, res, next) => {
+      const csp =
+        "default-src 'self'; " +
+        `connect-src 'self' http://localhost:${port} http://127.0.0.1:${port} ws://localhost:${port} ws://127.0.0.1:${port}; ` +
+        "img-src 'self' data: blob:; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "script-src 'self' 'unsafe-inline'; " +
+        "font-src 'self' data:; " +
+        "frame-ancestors 'self'";
+      res.setHeader("Content-Security-Policy", csp);
+      next();
+    });
     app.use("/", express.static(distPath));
 
     app.get("/api/items", async (_req: Request, res: Response) => {
@@ -239,6 +253,25 @@ export default class VaultForgePlayer extends Plugin {
         if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
         const q = String(req.query.q || "");
         const type = String(req.query.type || "all");
+        // If searching classes, try class export index for stronger results
+        if (type === 'classes' || type === 'class') {
+          try {
+            const api = (this.app as any).vaultforge5etools;
+            // Ensure master index is built (not strictly required here, but keeps caches warm)
+            api.masterIndex = api.masterIndex ?? await api.buildMasterIndex();
+            const dataPathAbs = (this.app.vault.adapter as any).basePath + '/.obsidian/plugins/' + this.manifest.id.replace('vaultforge-player','vaultforge-5etools') + '/data';
+            // Defer to the vf.readTableFromData via getTable('classes') which uses class/index.json when present
+            const classes = await api.getTable('classes');
+            const qn = q.toLowerCase();
+            const filtered = classes.filter((c: any) =>
+              (c.name && String(c.name).toLowerCase().includes(qn)) ||
+              (c.subclasses && c.subclasses.some((s: any) => String((s && s.name) || s).toLowerCase().includes(qn)))
+            );
+            return res.json(filtered);
+          } catch (er) {
+            // fall through to generic search
+          }
+        }
         const results = await vf.searchName(q, type);
         res.json(results);
       } catch (e) {
@@ -258,6 +291,33 @@ export default class VaultForgePlayer extends Plugin {
       } catch (e) {
         console.error("[VaultForge-Player] vaultforge export error", e);
         res.status(500).json({ error: "Export failed" });
+      }
+    });
+
+    // Serve master index for frontend fallback searches
+    app.get("/vaultforge/cache/master-index.json", async (_req: Request, res: Response) => {
+      try {
+        const vf = (this.app as any).vaultforge5etools;
+        if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
+        const idx = vf.masterIndex ?? await vf.buildMasterIndex();
+        res.json(idx);
+      } catch (e) {
+        console.error("[VaultForge-Player] master-index error", e);
+        res.status(500).json({ error: "Failed to load master index" });
+      }
+    });
+
+    // Serve raw class index from 5eTools data (for class-specific searches)
+    app.get("/vaultforge/data/class/index.json", async (_req: Request, res: Response) => {
+      try {
+        const base = (this.app.vault.adapter as any).basePath;
+        const fp = join(base, ".obsidian", "plugins", "vaultforge-5etools", "data", "class", "index.json");
+        if (!fs.existsSync(fp)) return res.status(404).json({ error: "class index not found" });
+        res.setHeader("Content-Type", "application/json");
+        res.send(fs.readFileSync(fp, "utf-8"));
+      } catch (e) {
+        console.error("[VaultForge-Player] class index error", e);
+        res.status(500).json({ error: "Failed to load class index" });
       }
     });
 

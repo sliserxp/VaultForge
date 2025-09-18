@@ -4010,7 +4010,7 @@ var require_utils2 = __commonJS({
 // node_modules/qrcode/lib/renderer/png.js
 var require_png2 = __commonJS({
   "node_modules/qrcode/lib/renderer/png.js"(exports2) {
-    var fs = require("fs");
+    var fs2 = require("fs");
     var PNG = require_png().PNG;
     var Utils = require_utils2();
     exports2.render = function render(qrData, options) {
@@ -4062,7 +4062,7 @@ var require_png2 = __commonJS({
         called = true;
         cb.apply(null, args);
       };
-      const stream = fs.createWriteStream(path);
+      const stream = fs2.createWriteStream(path);
       stream.on("error", done);
       stream.on("close", done);
       exports2.renderToFileStream(stream, qrData, options);
@@ -4129,9 +4129,9 @@ var require_utf8 = __commonJS({
         cb = options;
         options = void 0;
       }
-      const fs = require("fs");
+      const fs2 = require("fs");
       const utf8 = exports2.render(qrData, options);
-      fs.writeFile(path, utf8, cb);
+      fs2.writeFile(path, utf8, cb);
     };
   }
 });
@@ -4305,10 +4305,10 @@ var require_svg = __commonJS({
         cb = options;
         options = void 0;
       }
-      const fs = require("fs");
+      const fs2 = require("fs");
       const svgTag = exports2.render(qrData, options);
       const xmlStr = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' + svgTag;
-      fs.writeFile(path, xmlStr, cb);
+      fs2.writeFile(path, xmlStr, cb);
     };
   }
 });
@@ -5823,8 +5823,8 @@ var require_node = __commonJS({
           }
           break;
         case "FILE":
-          var fs = require("fs");
-          stream2 = new fs.SyncWriteStream(fd2, { autoClose: false });
+          var fs2 = require("fs");
+          stream2 = new fs2.SyncWriteStream(fd2, { autoClose: false });
           stream2._type = "fs";
           break;
         case "PIPE":
@@ -22806,7 +22806,7 @@ var require_view = __commonJS({
     "use strict";
     var debug = require_src()("express:view");
     var path = require("path");
-    var fs = require("fs");
+    var fs2 = require("fs");
     var dirname = path.dirname;
     var basename = path.basename;
     var extname = path.extname;
@@ -22872,7 +22872,7 @@ var require_view = __commonJS({
     function tryStat(path2) {
       debug('stat "%s"', path2);
       try {
-        return fs.statSync(path2);
+        return fs2.statSync(path2);
       } catch (e) {
         return void 0;
       }
@@ -23241,7 +23241,7 @@ var require_types = __commonJS({
 var require_mime = __commonJS({
   "node_modules/mime/mime.js"(exports2, module2) {
     var path = require("path");
-    var fs = require("fs");
+    var fs2 = require("fs");
     function Mime() {
       this.types = /* @__PURE__ */ Object.create(null);
       this.extensions = /* @__PURE__ */ Object.create(null);
@@ -23262,7 +23262,7 @@ var require_mime = __commonJS({
     };
     Mime.prototype.load = function(file) {
       this._loading = file;
-      var map = {}, content = fs.readFileSync(file, "ascii"), lines = content.split(/[\r\n]+/);
+      var map = {}, content = fs2.readFileSync(file, "ascii"), lines = content.split(/[\r\n]+/);
       lines.forEach(function(line) {
         var fields = line.replace(/\s*#.*|^\s*|\s*$/g, "").split(/\s+/);
         map[fields.shift()] = fields;
@@ -23500,7 +23500,7 @@ var require_send = __commonJS({
     var escapeHtml = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
-    var fs = require("fs");
+    var fs2 = require("fs");
     var mime = require_mime();
     var ms = require_ms2();
     var onFinished = require_on_finished();
@@ -23833,7 +23833,7 @@ var require_send = __commonJS({
       var i = 0;
       var self = this;
       debug('stat "%s"', path2);
-      fs.stat(path2, function onstat(err, stat) {
+      fs2.stat(path2, function onstat(err, stat) {
         if (err && err.code === "ENOENT" && !extname(path2) && path2[path2.length - 1] !== sep) {
           return next(err);
         }
@@ -23848,7 +23848,7 @@ var require_send = __commonJS({
         }
         var p = path2 + "." + self._extensions[i++];
         debug('stat "%s"', p);
-        fs.stat(p, function(err2, stat) {
+        fs2.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -23866,7 +23866,7 @@ var require_send = __commonJS({
         }
         var p = join2(path2, self._index[i]);
         debug('stat "%s"', p);
-        fs.stat(p, function(err2, stat) {
+        fs2.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
           self.emit("file", p, stat);
@@ -23878,7 +23878,7 @@ var require_send = __commonJS({
     SendStream.prototype.stream = function stream(path2, options) {
       var self = this;
       var res = this.res;
-      var stream2 = fs.createReadStream(path2, options);
+      var stream2 = fs2.createReadStream(path2, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
       function cleanup() {
@@ -27010,6 +27010,7 @@ var import_qrcode = __toESM(require_lib());
 var import_os = __toESM(require("os"));
 var import_express = __toESM(require_express2());
 var import_path = require("path");
+var import_fs = __toESM(require("fs"));
 var DEFAULT_SETTINGS = {
   port: 3e3,
   playersPath: "Players",
@@ -27072,6 +27073,11 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
       "frontend",
       "dist"
     );
+    app.use((req, res, next) => {
+      const csp = `default-src 'self'; connect-src 'self' http://localhost:${port} http://127.0.0.1:${port} ws://localhost:${port} ws://127.0.0.1:${port}; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-ancestors 'self'`;
+      res.setHeader("Content-Security-Policy", csp);
+      next();
+    });
     app.use("/", import_express.default.static(distPath));
     app.get("/api/items", async (_req, res) => {
       try {
@@ -27155,6 +27161,20 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
         if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
         const q = String(req.query.q || "");
         const type = String(req.query.type || "all");
+        if (type === "classes" || type === "class") {
+          try {
+            const api = this.app.vaultforge5etools;
+            api.masterIndex = api.masterIndex ?? await api.buildMasterIndex();
+            const dataPathAbs = this.app.vault.adapter.basePath + "/.obsidian/plugins/" + this.manifest.id.replace("vaultforge-player", "vaultforge-5etools") + "/data";
+            const classes = await api.getTable("classes");
+            const qn = q.toLowerCase();
+            const filtered = classes.filter(
+              (c) => c.name && String(c.name).toLowerCase().includes(qn) || c.subclasses && c.subclasses.some((s) => String(s && s.name || s).toLowerCase().includes(qn))
+            );
+            return res.json(filtered);
+          } catch (er) {
+          }
+        }
         const results = await vf.searchName(q, type);
         res.json(results);
       } catch (e) {
@@ -27173,6 +27193,29 @@ var VaultForgePlayer = class extends import_obsidian.Plugin {
       } catch (e) {
         console.error("[VaultForge-Player] vaultforge export error", e);
         res.status(500).json({ error: "Export failed" });
+      }
+    });
+    app.get("/vaultforge/cache/master-index.json", async (_req, res) => {
+      try {
+        const vf = this.app.vaultforge5etools;
+        if (!vf) return res.status(404).json({ error: "VaultForge plugin not available" });
+        const idx = vf.masterIndex ?? await vf.buildMasterIndex();
+        res.json(idx);
+      } catch (e) {
+        console.error("[VaultForge-Player] master-index error", e);
+        res.status(500).json({ error: "Failed to load master index" });
+      }
+    });
+    app.get("/vaultforge/data/class/index.json", async (_req, res) => {
+      try {
+        const base = this.app.vault.adapter.basePath;
+        const fp = (0, import_path.join)(base, ".obsidian", "plugins", "vaultforge-5etools", "data", "class", "index.json");
+        if (!import_fs.default.existsSync(fp)) return res.status(404).json({ error: "class index not found" });
+        res.setHeader("Content-Type", "application/json");
+        res.send(import_fs.default.readFileSync(fp, "utf-8"));
+      } catch (e) {
+        console.error("[VaultForge-Player] class index error", e);
+        res.status(500).json({ error: "Failed to load class index" });
       }
     });
     app.put(

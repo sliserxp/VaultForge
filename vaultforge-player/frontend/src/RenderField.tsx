@@ -191,33 +191,36 @@ export function RenderField({ schema, value, onChange, parentValue }: any) {
         </div>
       );
     case "list":
-      return (
-        <div className="space-y-2">
-          {(value || []).map((item: any, i: number) => (
-            <div key={i} className="flex space-x-2">
-              {Object.entries(schema.itemFields).map(([ik, subSchema]: any) => (
-                <RenderField
-                  key={ik}
-                  schema={subSchema}
-                  value={item[ik]}
-                  onChange={(val: any) => {
-                    const newList = [...value];
-                    newList[i][ik] = val;
-                    onChange(newList);
-                  }}
-                  parentValue={value}
-                />
-              ))}
-            </div>
-          ))}
-          <button
-            className="bg-gray-200 px-2 py-1 rounded"
-            onClick={() => onChange([...(value || []), {}])}
-          >
-            + Add
-          </button>
-        </div>
-      );
+      {
+        const list = Array.isArray(value) ? value : [];
+        return (
+          <div className="space-y-2">
+            {list.map((item: any, i: number) => (
+              <div key={i} className="flex space-x-2">
+                {Object.entries(schema.itemFields).map(([ik, subSchema]: any) => (
+                  <RenderField
+                    key={ik}
+                    schema={subSchema}
+                    value={item[ik]}
+                    onChange={(val: any) => {
+                      const newList = [...list];
+                      newList[i][ik] = val;
+                      onChange(newList);
+                    }}
+                    parentValue={value}
+                  />
+                ))}
+              </div>
+            ))}
+            <button
+              className="bg-gray-200 px-2 py-1 rounded"
+              onClick={() => onChange([...list, {}])}
+            >
+              + Add
+            </button>
+          </div>
+        );
+      }
     default:
       return null;
   }

@@ -8,7 +8,8 @@ onRemove: (index: number) => void;
 
 
 export function Inventory({ items, onRemove }: InventoryProps) {
-if (!items || items.length === 0) {
+const list = Array.isArray(items) ? items : [];
+if (list.length === 0) {
 return <p>No items in inventory.</p>;
 }
 
@@ -17,7 +18,7 @@ return (
 <div className="p-4">
 <h2 className="text-xl font-bold mb-4">🎒 Inventory</h2>
 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-{items.map((item, idx) => (
+{list.map((item, idx) => (
 <div
 key={idx}
 className="p-3 rounded-lg bg-gray-700 shadow flex justify-between"

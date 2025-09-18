@@ -15,6 +15,21 @@ export default function ImportTab() {
       const res = await fetch(`/api/vaultforge/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
       if (res.ok) {
         const r = await res.json();
+        if ((!r || r.length === 0) && type === 'classes') {
+          try {
+            const cj = await fetch('/vaultforge/data/class/index.json');
+            if (cj.ok) {
+              const idx = await cj.json();
+              const qn = q.toLowerCase();
+              const hits = (Array.isArray(idx) ? idx : []).filter((it: any) =>
+                String(it.class || '').toLowerCase().includes(qn) ||
+                (Array.isArray(it.subclasses) && it.subclasses.some((s: any) => String(s).toLowerCase().includes(qn)))
+              ).map((it: any) => ({ name: it.class, type: 'class' }));
+              setResults(hits);
+              return;
+            }
+          } catch (_) { /* ignore */ }
+        }
         setResults(r || []);
       } else {
         // fallback to master-index name match — try common locations and avoid hard failure
@@ -48,7 +63,21 @@ export default function ImportTab() {
 
   async function importUid(uidOrObj: any) {
     try {
-      const uid = uidOrObj.uid ?? `${uidOrObj.name}|${uidOrObj.source ?? "Unknown"}`;
+      let uid = uidOrObj.uid ?? null;
+      if (!uid && uidOrObj.name && type === 'classes') {
+        // Resolve a proper UID using the server search for classes
+        try {
+          const sr = await fetch(`/api/vaultforge/search?q=${encodeURIComponent(uidOrObj.name)}&type=classes`);
+          if (sr.ok) {
+            const arr = await sr.json();
+            if (arr && arr.length) {
+              const m = arr.find((e: any) => e && e.uid) || arr[0];
+              uid = m.uid ?? `${m.name}|${m.source ?? 'Unknown'}`;
+            }
+          }
+        } catch (_) { /* ignore */ }
+      }
+      if (!uid) uid = `${uidOrObj.name}|${uidOrObj.source ?? "Unknown"}`;
       const payloadRes = await fetch(`/api/vaultforge/export?uid=${encodeURIComponent(uid)}`);
       if (!payloadRes.ok) throw new Error("export failed");
       const payload = await payloadRes.json();
