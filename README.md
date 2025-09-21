@@ -1,4 +1,4 @@
-*disclaimer* i have no idea what im doing.
+*disclaimer* i have a vague idea in what im doing. working on learning other code and whatnot. 
 
 Note: mcp-server will be added to serve repo files as on-demand context to a local LLM (avoids uploading the whole repo). See mcp-server/README.md for setup.
 (you'll need your own openai api keys)
@@ -24,7 +24,7 @@ vault's structure in mind
 
 5etools database /data was used to construct the 5etools.db with meta tags (yaml update coming)
 
-Trying to learn coding by doing with help in VScodium and ChatGPT, and ChatGPT-API. 
+Trying to learn coding by doing.
 thanks for checking it out.
 
 Attribution (just in case , and love the source)
